@@ -3,6 +3,7 @@ const BALL_OPTIONS = [75, 90];
 const DEFAULT_MAX = 90;
 const ROLL_MS = 800;
 const HISTORY_SIZE = 5;
+const VOICE_TIMEOUT_MS = 2500;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
 // Apple lists its robotic "Eloquence" voices first; skip them for a natural one (Paulina, Mónica…).
 const ROBOTIC_VOICES = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b|eloquence/i;
@@ -15,6 +16,7 @@ const els = {
   announce: document.getElementById('announce'),
   draw: document.getElementById('draw'),
   repeat: document.getElementById('repeat'),
+  actions: document.querySelector('.actions'),
   history: document.getElementById('history'),
   board: document.getElementById('board'),
   count: document.getElementById('count'),
@@ -29,15 +31,17 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let state = load();
 let rolling = false;
 let voice = null;
-let speechPrimed = false;
+let utterance = null;
 let speakTimer = null;
+let voiceTimer = null;
+let voiceProblem = false;
 let wakeLock = null;
 let wakeLockPending = false;
 let cells = [];
 
 // --- State -----------------------------------------------------------------
 
-function load() {
+function readSaved() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && BALL_OPTIONS.includes(saved.max) && Array.isArray(saved.drawn)) {
@@ -45,9 +49,13 @@ function load() {
       return { max: saved.max, drawn: [...new Set(drawn)], muted: Boolean(saved.muted) };
     }
   } catch {
-    // Storage blocked or corrupt: start a fresh game.
+    // Storage blocked or corrupt.
   }
-  return { max: DEFAULT_MAX, drawn: [], muted: false };
+  return null;
+}
+
+function load() {
+  return readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false };
 }
 
 function save() {
@@ -56,6 +64,16 @@ function save() {
   } catch {
     // Storage blocked: the game still works, it just won't survive a reload.
   }
+}
+
+// Another tab with the same game may have drawn balls; adopt its state so we never repeat one.
+function syncFromStorage() {
+  const saved = readSaved();
+  if (!saved || rolling) return;
+  const maxChanged = saved.max !== state.max;
+  state = saved;
+  if (maxChanged) buildBoard();
+  render();
 }
 
 function remaining() {
@@ -86,32 +104,61 @@ function pickVoice() {
     null;
 }
 
+function setVoiceProblem(value) {
+  if (voiceProblem === value) return;
+  voiceProblem = value;
+  render();
+}
+
+function stopSpeech() {
+  clearTimeout(speakTimer);
+  clearTimeout(voiceTimer);
+  speech?.cancel();
+}
+
 function speak(text, volume = 1) {
   if (!speech) return;
-  const utterance = new SpeechSynthesisUtterance(text);
+  if (!voice) pickVoice();
+  // Kept in a module variable: Chrome can garbage-collect a local utterance before its events fire.
+  utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = voice?.lang ?? 'es-AR';
   if (voice) utterance.voice = voice;
   utterance.rate = 0.9;
   utterance.volume = volume;
 
+  if (volume > 0) {
+    // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host.
+    clearTimeout(voiceTimer);
+    voiceTimer = setTimeout(() => setVoiceProblem(true), VOICE_TIMEOUT_MS);
+    utterance.onstart = () => {
+      clearTimeout(voiceTimer);
+      setVoiceProblem(false);
+    };
+    utterance.onerror = (event) => {
+      if (event.error === 'interrupted' || event.error === 'canceled') return;
+      clearTimeout(voiceTimer);
+      setVoiceProblem(true);
+    };
+  }
+
+  const next = utterance;
   clearTimeout(speakTimer);
   // Chrome can stay paused after the tab was in the background.
   if (speech.paused) speech.resume();
   if (speech.speaking || speech.pending) {
     speech.cancel();
     // Some engines drop a speak() that comes right after cancel(), so give it a moment.
-    speakTimer = setTimeout(() => speech.speak(utterance), 60);
+    speakTimer = setTimeout(() => speech.speak(next), 60);
   } else {
-    speech.speak(utterance);
+    speech.speak(next);
   }
 }
 
 // iOS only lets a page speak after a speak() call inside a user gesture.
-// The real announcement happens after the roll animation, so unlock it up front.
+// The real announcement comes after the roll animation, so unlock speech on every tap.
 function primeSpeech() {
-  if (speechPrimed || !speech || state.muted) return;
+  if (!speech || state.muted || speech.speaking || speech.pending) return;
   speak(' ', 0);
-  speechPrimed = true;
 }
 
 function callout(n) {
@@ -124,8 +171,15 @@ function callout(n) {
 }
 
 function announce(n) {
-  els.announce.textContent = `Salió el ${n}`;
-  if (!state.muted) speak(callout(n));
+  if (speech && !state.muted) {
+    speak(callout(n));
+    return;
+  }
+  // Screen readers only, when the voice is off. Clear first so "Repetir" re-announces the same text.
+  els.announce.textContent = '';
+  requestAnimationFrame(() => {
+    els.announce.textContent = `Salió el ${n}`;
+  });
 }
 
 // --- Screen wake lock --------------------------------------------------------
@@ -190,8 +244,8 @@ async function draw() {
 }
 
 function newGame(max = state.max) {
-  clearTimeout(speakTimer);
-  speech?.cancel();
+  stopSpeech();
+  voiceProblem = false;
   state = { ...state, max, drawn: [] };
   save();
   buildBoard();
@@ -205,7 +259,9 @@ function buildBoard() {
   const fragment = document.createDocumentFragment();
   for (let n = 1; n <= state.max; n += 1) {
     const li = document.createElement('li');
-    li.textContent = n;
+    const label = document.createElement('span');
+    label.className = 'sr-only';
+    li.append(String(n), label);
     cells[n] = li;
     fragment.append(li);
   }
@@ -224,11 +280,14 @@ function render() {
   }
 
   if (rolling) els.status.textContent = 'Girando…';
+  else if (voiceProblem && !muted) els.status.textContent = '¿No se escucha? Subí el volumen o sacá el modo silencio y tocá «Repetir».';
   else if (left === 0) els.status.textContent = '¡Salieron todas las bolillas!';
   else if (last === undefined) els.status.textContent = 'Tocá «Sacar bolilla» para empezar';
   else els.status.textContent = `Quedan ${left}`;
 
-  els.draw.disabled = rolling || left === 0;
+  // aria-disabled (not disabled) during the roll, so the button keeps keyboard and screen-reader focus.
+  els.draw.disabled = left === 0;
+  els.draw.setAttribute('aria-disabled', String(rolling));
   els.repeat.disabled = rolling || last === undefined || muted || !speech;
   els.reset.disabled = rolling;
   els.max.disabled = rolling;
@@ -252,8 +311,10 @@ function render() {
 
   els.count.textContent = `${drawn.length} / ${max}`;
   cells.forEach((cell, n) => {
-    cell.classList.toggle('drawn', drawnSet.has(n));
+    const isDrawn = drawnSet.has(n);
+    cell.classList.toggle('drawn', isDrawn);
     cell.classList.toggle('last', n === last);
+    cell.lastChild.textContent = isDrawn ? ', salió' : '';
   });
 }
 
@@ -268,10 +329,8 @@ els.repeat.addEventListener('click', () => {
 
 els.mute.addEventListener('click', () => {
   state.muted = !state.muted;
-  if (state.muted) {
-    clearTimeout(speakTimer);
-    speech?.cancel();
-  }
+  if (state.muted) stopSpeech();
+  voiceProblem = false;
   save();
   render();
 });
@@ -297,13 +356,36 @@ document.addEventListener('keydown', (event) => {
   draw();
 });
 
+// Ask for the wake lock on the first touch too, so the screen stays on before the first draw.
+document.addEventListener('pointerdown', keepAwake, { once: true });
+
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && state.drawn.length) keepAwake();
+  if (document.visibilityState === 'hidden') {
+    // Don't let a half-spoken number play late when the host comes back.
+    stopSpeech();
+    return;
+  }
+  syncFromStorage();
+  if (state.drawn.length) keepAwake();
 });
+
+window.addEventListener('storage', (event) => {
+  if (event.key === STORAGE_KEY) syncFromStorage();
+});
+
+// Keep the page padding in step with the real height of the bottom bar (large text, safe areas).
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--bar-height', `${els.actions.offsetHeight}px`);
+}).observe(els.actions);
 
 if (speech) {
   pickVoice();
   speech.addEventListener('voiceschanged', pickVoice);
+}
+
+// Offline support for the deployed site. Skipped on localhost so it never caches other local dev servers.
+if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 buildBoard();

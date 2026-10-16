@@ -10,10 +10,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bolillero" />
     <title>Bolillero</title>
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎱</text></svg>"
-    />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
     <script src="app.js" defer></script>
   </head>
@@ -29,7 +28,7 @@
           <span class="ball-number" id="current">–</span>
         </div>
         <p class="status" id="status"></p>
-        <p class="sr-only" id="announce" aria-live="assertive" aria-atomic="true"></p>
+        <p class="sr-only" id="announce" aria-live="polite" aria-atomic="true"></p>
 
         <div class="actions">
           <button id="draw" class="primary" type="button">Sacar bolilla</button>

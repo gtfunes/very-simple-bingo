@@ -11,7 +11,8 @@
   --gold: #ffc23d;
   --on-gold: #1d1606;
   --ball-size: min(62vw, 36vh, 300px);
-  --bar-height: 88px;
+  /* Replaced at runtime with the measured bar height (see app.js). */
+  --bar-height: calc(89px + env(safe-area-inset-bottom, 0px));
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --gutter-left: max(16px, env(safe-area-inset-left, 0px));
@@ -99,6 +100,7 @@ select:focus-visible {
 }
 
 button:disabled,
+button[aria-disabled="true"],
 select:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -135,7 +137,7 @@ select:disabled {
   max-width: 1200px;
   margin: 0 auto;
   /* Leave room for the fixed action bar on phones. */
-  padding: 8px var(--gutter-right) calc(var(--bar-height) + var(--safe-bottom) + 24px) var(--gutter-left);
+  padding: 8px var(--gutter-right) calc(var(--bar-height) + 24px) var(--gutter-left);
 }
 
 /* Caller: ball, actions, history */
@@ -282,7 +284,7 @@ select:disabled {
 
 .board {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 5px;
   margin: 0;
   padding: 0;
@@ -290,12 +292,13 @@ select:disabled {
 }
 
 .board li {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
   border-radius: 8px;
   background: rgb(255 255 255 / 0.05);
-  color: rgb(255 255 255 / 0.4);
+  color: rgb(255 255 255 / 0.55);
   font-size: clamp(0.85rem, 3.6vw, 1.3rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -345,7 +348,7 @@ select:disabled {
   .app {
     grid-template-columns: minmax(320px, 400px) 1fr;
     align-items: start;
-    padding: 16px 24px 32px;
+    padding: 16px var(--gutter-right) calc(32px + var(--safe-bottom)) var(--gutter-left);
   }
 
   .actions {

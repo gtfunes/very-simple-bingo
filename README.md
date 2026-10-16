@@ -12,6 +12,8 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
 - Keeps the screen on during a game, where the browser supports it.
+- Works offline after the first visit, and installs to the Home Screen with its own icon.
+- Shows a hint when the voice does not start (for example, silent mode on an iPhone).
 - Press <kbd>Space</kbd> to draw a ball.
 
 The interface text is in Spanish (Argentina).
@@ -23,6 +25,8 @@ python3 -m http.server 5173
 ```
 
 Then open <http://localhost:5173>.
+
+The service worker (offline support) is off on `localhost`, so it never caches other local dev servers. To test it, open <http://bingo.localhost:5173> instead.
 
 ## Deploy to Vercel
 
@@ -39,8 +43,9 @@ pnpm dlx vercel --prod
 ## Notes
 
 - The voice depends on the device. If it has no Spanish voice, the browser uses its default voice.
-- If you hear nothing on an iPhone, turn off silent mode.
+- If you hear nothing on an iPhone, turn off silent mode and tap **Repetir**.
 - For a full-screen app feel, open the site on the phone and use **Add to Home Screen**.
+- To regenerate the PNG icons after editing `icons/icon.svg`: `for s in 180 192 512; do rsvg-convert -w $s -h $s icons/icon.svg -o icons/icon-$s.png; done`.
 
 ## License
 
