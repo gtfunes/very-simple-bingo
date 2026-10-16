@@ -7,8 +7,9 @@ Thumbs.db
 .idea/
 *.swp
 
-# Vercel
+# Vercel (link data and the CLI's token file)
 .vercel
+.env*
 
 # Dependencies (none today, kept in case tooling is added)
 node_modules/

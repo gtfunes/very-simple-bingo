@@ -1,0 +1,10 @@
+# Allow-list: upload only what the site serves. Everything uploaded is public.
+/*
+!index.html
+!styles.css
+!app.js
+!sw.js
+!manifest.webmanifest
+!icons
+!icons/**
+!vercel.json

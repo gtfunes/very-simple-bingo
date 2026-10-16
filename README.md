@@ -30,6 +30,7 @@ The interface text is in Spanish (Argentina).
 | `manifest.webmanifest` | Home Screen app name, colors and icons.                                 |
 | `icons/`               | `icon.svg` (source and favicon) and the PNG sizes made from it.         |
 | `vercel.json`          | Security headers for the deployed site.                                 |
+| `.vercelignore`        | Allow-list of the files uploaded to Vercel (they are all public).      |
 
 ## Run locally
 
@@ -44,21 +45,25 @@ Then open <http://localhost:5173>.
 
 ## Deploy to Vercel
 
-Vercel serves the repository root as a static site. There is no build step.
+The live site is <https://simple-bingo-rho.vercel.app> (Vercel project `simple-bingo`). Vercel serves the uploaded files as a static site. There is no build step.
 
-1. In the Vercel project, open **Settings → Git** and connect `gtfunes/very-simple-bingo`. The repository is private: if it is not listed, give the Vercel GitHub app access to it.
-2. In **Settings → Build and Deployment**, set **Framework Preset** to **Other**. Leave **Build Command**, **Output Directory** and **Root Directory** empty.
-3. Push to `main`. Each push to `main` deploys to production. Other branches get a preview URL.
-
-To deploy from the terminal instead, use the Vercel CLI. It asks you to sign in the first time.
+Deploy from the terminal with the Vercel CLI. Run `login` and `link` once per machine.
 
 ```bash
-pnpm dlx vercel link
+pnpm dlx vercel login
 ```
 
 ```bash
-pnpm dlx vercel --prod
+pnpm dlx vercel link --yes --project simple-bingo
 ```
+
+```bash
+pnpm dlx vercel deploy --prod
+```
+
+- `.vercelignore` is an allow-list. Only the files the site serves are uploaded, so a new file the site needs must be added there, or it returns 404 in production.
+- `vercel link` creates `.vercel/` and `.env.local`. Both are in `.gitignore`, and `.vercelignore` keeps them out of the upload.
+- To deploy on every push to `main` instead, give the Vercel GitHub app access to this private repository (GitHub → **Settings → Applications → Vercel → Configure**). Then connect the repository in the project's **Settings → Git**.
 
 ## Security
 
@@ -76,7 +81,7 @@ The site is static: no backend, no accounts, no cookies, and no third-party scri
 - The voice depends on the device. The app picks a natural Spanish voice and skips Apple's robotic novelty voices. If the device has no Spanish voice, the browser uses its default voice.
 - If you hear nothing on an iPhone, turn off silent mode and tap **Repetir**.
 - For a full-screen app feel, open the site on the phone and use **Add to Home Screen**.
-- If you add a file the app needs offline, add it to `ASSETS` in `sw.js`.
+- If you add a file the app needs, add it to `.vercelignore` (so it is uploaded) and to `ASSETS` in `sw.js` (so it works offline).
 - To regenerate the PNG icons after you edit `icons/icon.svg`, install `librsvg` (`brew install librsvg`) and run:
 
 ```bash
