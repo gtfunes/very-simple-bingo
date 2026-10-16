@@ -40,6 +40,10 @@ To deploy from the terminal instead, use the Vercel CLI:
 pnpm dlx vercel --prod
 ```
 
+## Security
+
+The site is static: no backend, no accounts, no cookies, and no third-party scripts. `vercel.json` adds security headers (a strict Content Security Policy, no framing, no referrer, and a Permissions Policy that blocks camera, microphone and location). It also asks search engines not to index the site. Delete the `X-Robots-Tag` header if you want it indexed.
+
 ## Notes
 
 - The voice depends on the device. If it has no Spanish voice, the browser uses its default voice.
