@@ -4,6 +4,8 @@ const DEFAULT_MAX = 90;
 const ROLL_MS = 800;
 const HISTORY_SIZE = 5;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
+// Apple lists its robotic "Eloquence" voices first; skip them for a natural one (Paulina, Mónica…).
+const ROBOTIC_VOICES = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b|eloquence/i;
 const DIGIT_WORDS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
 
 const els = {
@@ -28,7 +30,9 @@ let state = load();
 let rolling = false;
 let voice = null;
 let speechPrimed = false;
+let speakTimer = null;
 let wakeLock = null;
+let wakeLockPending = false;
 let cells = [];
 
 // --- State -----------------------------------------------------------------
@@ -71,24 +75,35 @@ function randomIndex(length) {
 // --- Voice -----------------------------------------------------------------
 
 function pickVoice() {
-  const voices = speech.getVoices();
   const langOf = (v) => v.lang.replace('_', '-').toLowerCase();
+  const spanish = speech
+    .getVoices()
+    .filter((v) => langOf(v).startsWith('es') && !ROBOTIC_VOICES.test(v.name) && !ROBOTIC_VOICES.test(v.voiceURI));
   voice =
-    VOICE_LANGS.map((lang) => voices.find((v) => langOf(v) === lang)).find(Boolean) ??
-    voices.find((v) => langOf(v).startsWith('es')) ??
+    spanish.find((v) => v.default) ??
+    VOICE_LANGS.map((lang) => spanish.find((v) => langOf(v) === lang)).find(Boolean) ??
+    spanish[0] ??
     null;
 }
 
 function speak(text, volume = 1) {
   if (!speech) return;
-  // Some engines drop a speak() that comes right after cancel(), so only cancel when needed.
-  if (speech.speaking || speech.pending) speech.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = voice?.lang ?? 'es-AR';
   if (voice) utterance.voice = voice;
   utterance.rate = 0.9;
   utterance.volume = volume;
-  speech.speak(utterance);
+
+  clearTimeout(speakTimer);
+  // Chrome can stay paused after the tab was in the background.
+  if (speech.paused) speech.resume();
+  if (speech.speaking || speech.pending) {
+    speech.cancel();
+    // Some engines drop a speak() that comes right after cancel(), so give it a moment.
+    speakTimer = setTimeout(() => speech.speak(utterance), 60);
+  } else {
+    speech.speak(utterance);
+  }
 }
 
 // iOS only lets a page speak after a speak() call inside a user gesture.
@@ -116,7 +131,8 @@ function announce(n) {
 // --- Screen wake lock --------------------------------------------------------
 
 async function keepAwake() {
-  if (!('wakeLock' in navigator) || wakeLock) return;
+  if (!('wakeLock' in navigator) || wakeLock || wakeLockPending) return;
+  wakeLockPending = true;
   try {
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', () => {
@@ -124,6 +140,8 @@ async function keepAwake() {
     });
   } catch {
     // Denied (for example, battery saver): the screen may dim, nothing else breaks.
+  } finally {
+    wakeLockPending = false;
   }
 }
 
@@ -172,6 +190,7 @@ async function draw() {
 }
 
 function newGame(max = state.max) {
+  clearTimeout(speakTimer);
   speech?.cancel();
   state = { ...state, max, drawn: [] };
   save();
@@ -204,7 +223,8 @@ function render() {
     els.ball.classList.toggle('empty', last === undefined);
   }
 
-  if (left === 0) els.status.textContent = '¡Salieron todas las bolillas!';
+  if (rolling) els.status.textContent = 'Girando…';
+  else if (left === 0) els.status.textContent = '¡Salieron todas las bolillas!';
   else if (last === undefined) els.status.textContent = 'Tocá «Sacar bolilla» para empezar';
   else els.status.textContent = `Quedan ${left}`;
 
@@ -215,6 +235,7 @@ function render() {
   els.max.value = String(max);
 
   els.mute.hidden = !speech;
+  els.repeat.hidden = !speech;
   els.mute.setAttribute('aria-pressed', String(!muted));
   els.mute.textContent = muted ? '🔇 Voz' : '🔊 Voz';
 
@@ -247,7 +268,10 @@ els.repeat.addEventListener('click', () => {
 
 els.mute.addEventListener('click', () => {
   state.muted = !state.muted;
-  if (state.muted) speech?.cancel();
+  if (state.muted) {
+    clearTimeout(speakTimer);
+    speech?.cancel();
+  }
   save();
   render();
 });

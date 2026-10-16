@@ -14,6 +14,8 @@
   --bar-height: 88px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --gutter-left: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-right: max(16px, env(safe-area-inset-right, 0px));
 }
 
 * {
@@ -25,15 +27,22 @@ body {
   margin: 0;
 }
 
+html {
+  background-color: var(--bg);
+  /* Keeps pinch zoom but drops double-tap zoom, so fast taps never zoom the page. */
+  touch-action: manipulation;
+}
+
 body {
   min-height: 100dvh;
-  background: radial-gradient(circle at 20% -10%, var(--bg-glow), var(--bg) 55%) fixed;
-  background-color: var(--bg);
+  /* Not "fixed": iOS ignores it and it forces repaints while scrolling. */
+  background: radial-gradient(circle at 20% -10%, var(--bg-glow), var(--bg) 55%) no-repeat;
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.4;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -66,7 +75,6 @@ select {
   font: inherit;
   font-size: 1rem;
   cursor: pointer;
-  touch-action: manipulation;
 }
 
 button {
@@ -100,8 +108,10 @@ select:disabled {
   position: absolute;
   width: 1px;
   height: 1px;
+  margin: -1px;
+  padding: 0;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -114,7 +124,7 @@ select:disabled {
   gap: 12px;
   max-width: 1200px;
   margin: 0 auto;
-  padding: calc(12px + var(--safe-top)) 16px 4px;
+  padding: calc(12px + var(--safe-top)) var(--gutter-right) 4px var(--gutter-left);
 }
 
 /* Layout */
@@ -125,7 +135,7 @@ select:disabled {
   max-width: 1200px;
   margin: 0 auto;
   /* Leave room for the fixed action bar on phones. */
-  padding: 8px 16px calc(var(--bar-height) + var(--safe-bottom) + 24px);
+  padding: 8px var(--gutter-right) calc(var(--bar-height) + var(--safe-bottom) + 24px) var(--gutter-left);
 }
 
 /* Caller: ball, actions, history */
@@ -200,7 +210,7 @@ select:disabled {
   z-index: 10;
   display: flex;
   gap: 8px;
-  padding: 12px 16px calc(12px + var(--safe-bottom));
+  padding: 12px var(--gutter-right) calc(12px + var(--safe-bottom)) var(--gutter-left);
   border-top: 1px solid var(--border);
   background: rgb(18 18 42 / 0.92);
   -webkit-backdrop-filter: blur(10px);
