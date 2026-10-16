@@ -1,0 +1,366 @@
+:root {
+  color-scheme: dark;
+  --bg: #12122a;
+  --bg-glow: #2a2160;
+  --surface: #23234a;
+  --border: rgb(255 255 255 / 0.14);
+  --text: #f4f4fb;
+  --muted: #a6a6c8;
+  --accent: #ff5a5f;
+  --accent-dark: #b3262b;
+  --gold: #ffc23d;
+  --on-gold: #1d1606;
+  --ball-size: min(62vw, 36vh, 300px);
+  --bar-height: 88px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  min-height: 100dvh;
+  background: radial-gradient(circle at 20% -10%, var(--bg-glow), var(--bg) 55%) fixed;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.4;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+button,
+select {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: inherit;
+  /* 16px or more stops iOS Safari from zooming in on focus. */
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button {
+  transition: transform 0.1s;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+@media (hover: hover) {
+  button:hover:not(:disabled),
+  select:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 0.35);
+  }
+}
+
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Top bar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: calc(12px + var(--safe-top)) 16px 4px;
+}
+
+/* Layout */
+
+.app {
+  display: grid;
+  gap: 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+  /* Leave room for the fixed action bar on phones. */
+  padding: 8px 16px calc(var(--bar-height) + var(--safe-bottom) + 24px);
+}
+
+/* Caller: ball, actions, history */
+
+.caller {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.ball {
+  display: grid;
+  place-items: center;
+  width: var(--ball-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #ff9a9d, var(--accent) 42%, var(--accent-dark));
+  box-shadow:
+    inset -12px -16px 30px rgb(0 0 0 / 0.35),
+    0 24px 48px rgb(0 0 0 / 0.45);
+}
+
+.ball-number {
+  display: grid;
+  place-items: center;
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #e9e9f2);
+  color: #15152b;
+  font-size: calc(var(--ball-size) * 0.3);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.ball.empty .ball-number {
+  color: #b9b9cc;
+}
+
+.ball.rolling {
+  animation: shake 0.18s linear infinite;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg) translateX(-4px);
+  }
+  75% {
+    transform: rotate(10deg) translateX(4px);
+  }
+}
+
+.status {
+  margin: 0;
+  min-height: 1.4em;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* On phones the main buttons sit in a bar pinned to the bottom, within thumb reach. */
+.actions {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px calc(12px + var(--safe-bottom));
+  border-top: 1px solid var(--border);
+  background: rgb(18 18 42 / 0.92);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.actions .primary {
+  flex: 1;
+  min-height: 64px;
+  border: none;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.actions #repeat {
+  min-height: 64px;
+}
+
+@media (hover: hover) {
+  .actions .primary:hover:not(:disabled) {
+    background: #ffd36f;
+  }
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-list {
+  display: flex;
+  gap: 8px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-list li {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Board */
+
+.board-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.count {
+  margin-left: 8px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: normal;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board li {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(255 255 255 / 0.4);
+  font-size: clamp(0.85rem, 3.6vw, 1.3rem);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background-color 0.3s,
+    color 0.3s;
+}
+
+.board li.drawn {
+  background: var(--gold);
+  color: var(--on-gold);
+  font-weight: 800;
+}
+
+.board li.last {
+  background: #fff;
+  color: #15152b;
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+/* Options */
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.field select {
+  color: var(--text);
+}
+
+/* Wide screens: two columns, buttons back under the ball. */
+
+@media (min-width: 900px) {
+  .app {
+    grid-template-columns: minmax(320px, 400px) 1fr;
+    align-items: start;
+    padding: 16px 24px 32px;
+  }
+
+  .actions {
+    position: static;
+    width: 100%;
+    max-width: 400px;
+    padding: 0;
+    border: none;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .options {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ball.rolling {
+    animation: none;
+  }
+
+  button,
+  .board li {
+    transition: none;
+  }
+}

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="Bolillero de bingo: saca bolillas al azar y las anuncia en voz alta." />
+    <meta name="theme-color" content="#12122a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Bolillero" />
+    <title>Bolillero</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎱</text></svg>"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>🎱 Bolillero</h1>
+      <button id="mute" type="button" aria-pressed="true">🔊 Voz</button>
+    </header>
+
+    <main class="app">
+      <section class="caller" aria-label="Bolilla actual">
+        <div class="ball empty" id="ball">
+          <span class="ball-number" id="current">–</span>
+        </div>
+        <p class="status" id="status"></p>
+        <p class="sr-only" id="announce" aria-live="assertive" aria-atomic="true"></p>
+
+        <div class="actions">
+          <button id="draw" class="primary" type="button">Sacar bolilla</button>
+          <button id="repeat" type="button">Repetir</button>
+        </div>
+
+        <div class="history">
+          <h2>Anteriores</h2>
+          <ol id="history" class="history-list"></ol>
+        </div>
+      </section>
+
+      <section class="board-wrap" aria-labelledby="board-title">
+        <h2 id="board-title">Tablero <span id="count" class="count"></span></h2>
+        <ol id="board" class="board"></ol>
+      </section>
+
+      <section class="options" aria-label="Opciones">
+        <label class="field">
+          Bolillas
+          <select id="max">
+            <option value="90">1 a 90</option>
+            <option value="75">1 a 75</option>
+          </select>
+        </label>
+        <button id="reset" type="button">Nuevo juego</button>
+      </section>
+    </main>
+  </body>
+</html>
