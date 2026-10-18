@@ -356,8 +356,11 @@ function callout(n) {
 }
 
 // Called from a change event (a user gesture), so iOS lets it speak.
+// Only when the caller is idle: during a game the new voice simply takes over from the next callout,
+// instead of a sample cutting off the number that is being said.
 function previewVoice() {
-  if (!state.muted) speak('¡Hola! Así canto los números.');
+  if (state.muted || auto || rolling || finishSpeech || speech?.speaking || speech?.pending) return;
+  speak('¡Hola! Así canto los números.');
 }
 
 // Resolves when the callout is over (at once when the voice is off).
