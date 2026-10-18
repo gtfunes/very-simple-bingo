@@ -269,6 +269,7 @@ function makeUtterance(text, volume) {
 // Queues all the parts at once, so the audio never goes idle between them: phones clip the start
 // of speech that comes after a silence, and a short first digit ("cuatro") could vanish.
 // Returns a promise that resolves when the speech ends, fails, never starts or is replaced.
+// Silent speech (the iOS unlock) resolves at once: nothing waits on it, and it has no timeout.
 function speak(parts, volume = 1) {
   if (!speech) return Promise.resolve();
   if (!voice) pickVoice();
@@ -276,19 +277,22 @@ function speak(parts, volume = 1) {
   // Kept in a module variable: Chrome can garbage-collect a local utterance before its events fire.
   const queue = [parts].flat().map((text) => makeUtterance(text, volume));
   utterances = queue;
-  speechDone = new Promise((resolve) => {
-    finishSpeech = resolve;
-  });
-  queue.at(-1).onend = () => {
-    if (utterances === queue) settleSpeech();
-  };
 
   if (volume > 0) {
-    // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host.
+    speechDone = new Promise((resolve) => {
+      finishSpeech = resolve;
+    });
+    queue.at(-1).onend = () => {
+      if (utterances === queue) settleSpeech();
+    };
+    // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host,
+    // and stop auto mode so balls don't keep coming out in silence.
     clearTimeout(voiceTimer);
     voiceTimer = setTimeout(() => {
-      setVoiceProblem(true);
+      stopAuto();
       settleSpeech();
+      setVoiceProblem(true);
+      render();
     }, VOICE_TIMEOUT_MS);
     queue[0].onstart = () => {
       clearTimeout(voiceTimer);
@@ -307,7 +311,7 @@ function speak(parts, volume = 1) {
   } else {
     start();
   }
-  return speechDone;
+  return volume > 0 ? speechDone : Promise.resolve();
 }
 
 // iOS only lets a page speak after a speak() call inside a user gesture.
@@ -756,6 +760,8 @@ function onVoicesChanged() {
 }
 
 if (speech) {
+  // Chrome can keep speech queued from before a reload, and new speech would wait behind it.
+  speech.cancel();
   pickVoice();
   buildVoiceOptions();
   speech.addEventListener('voiceschanged', onVoicesChanged);
