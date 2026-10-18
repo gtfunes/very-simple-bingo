@@ -8,7 +8,7 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 
 - Big "Sacar bolilla" button pinned to the bottom of the screen, within thumb reach.
 - Draws balls from 1–90 (default) or 1–75, with no repeats.
-- Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Change the pause with `DIGITS_PAUSE_MS` in `app.js`.
+- Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Both parts are queued together, because phones clip the start of speech that follows a silence.
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
 - Keeps open tabs in sync, so a second tab never repeats a ball.

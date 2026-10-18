@@ -4,8 +4,6 @@ const DEFAULT_MAX = 90;
 const ROLL_MS = 800;
 const HISTORY_SIZE = 5;
 const VOICE_TIMEOUT_MS = 2500;
-// Pause between the number and its digits: "47" … "cuatro, siete".
-const DIGITS_PAUSE_MS = 300;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
 // Apple lists its robotic "Eloquence" voices first; skip them for a natural one (Paulina, Mónica…).
 const ROBOTIC_VOICES = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b|eloquence/i;
@@ -33,9 +31,8 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let state = load();
 let rolling = false;
 let voice = null;
-let utterance = null;
+let utterances = [];
 let speakTimer = null;
-let followUpTimer = null;
 let voiceTimer = null;
 let voiceProblem = false;
 let wakeLock = null;
@@ -115,50 +112,56 @@ function setVoiceProblem(value) {
 
 function stopSpeech() {
   clearTimeout(speakTimer);
-  clearTimeout(followUpTimer);
   clearTimeout(voiceTimer);
-  // Forget the current utterance so its "end" event (fired on cancel by some engines) queues nothing.
-  utterance = null;
+  utterances = [];
   speech?.cancel();
 }
 
-function speak(text, volume = 1) {
-  if (!speech) return;
-  if (!voice) pickVoice();
-  // Any new speech replaces a follow-up that is still waiting.
-  clearTimeout(followUpTimer);
-  // Kept in a module variable: Chrome can garbage-collect a local utterance before its events fire.
-  utterance = new SpeechSynthesisUtterance(text);
+function makeUtterance(text, volume) {
+  const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = voice?.lang ?? 'es-AR';
   if (voice) utterance.voice = voice;
   utterance.rate = 0.9;
   utterance.volume = volume;
-
   if (volume > 0) {
-    // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host.
-    clearTimeout(voiceTimer);
-    voiceTimer = setTimeout(() => setVoiceProblem(true), VOICE_TIMEOUT_MS);
-    utterance.onstart = () => {
-      clearTimeout(voiceTimer);
-      setVoiceProblem(false);
-    };
     utterance.onerror = (event) => {
       if (event.error === 'interrupted' || event.error === 'canceled') return;
       clearTimeout(voiceTimer);
       setVoiceProblem(true);
     };
   }
+  return utterance;
+}
 
-  const next = utterance;
+// Queues all the parts at once, so the audio never goes idle between them: phones clip the start
+// of speech that comes after a silence, and a short first digit ("cuatro") could vanish.
+function speak(parts, volume = 1) {
+  if (!speech) return;
+  if (!voice) pickVoice();
+  // Kept in a module variable: Chrome can garbage-collect a local utterance before its events fire.
+  const queue = [parts].flat().map((text) => makeUtterance(text, volume));
+  utterances = queue;
+
+  if (volume > 0) {
+    // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host.
+    clearTimeout(voiceTimer);
+    voiceTimer = setTimeout(() => setVoiceProblem(true), VOICE_TIMEOUT_MS);
+    queue[0].onstart = () => {
+      clearTimeout(voiceTimer);
+      setVoiceProblem(false);
+    };
+  }
+
+  const start = () => queue.forEach((utterance) => speech.speak(utterance));
   clearTimeout(speakTimer);
   // Chrome can stay paused after the tab was in the background.
   if (speech.paused) speech.resume();
   if (speech.speaking || speech.pending) {
     speech.cancel();
     // Some engines drop a speak() that comes right after cancel(), so give it a moment.
-    speakTimer = setTimeout(() => speech.speak(next), 60);
+    speakTimer = setTimeout(start, 60);
   } else {
-    speech.speak(next);
+    start();
   }
 }
 
@@ -169,30 +172,19 @@ function primeSpeech() {
   speak(' ', 0);
 }
 
-// Says each part in turn, waiting DIGITS_PAUSE_MS after one ends before the next starts.
-function speakParts([first, ...rest]) {
-  speak(first);
-  if (rest.length === 0) return;
-  const current = utterance;
-  current.onend = () => {
-    // Newer speech (or stopSpeech) replaced this utterance: drop the rest.
-    if (utterance !== current) return;
-    followUpTimer = setTimeout(() => speakParts(rest), DIGITS_PAUSE_MS);
-  };
-}
-
+// "47." then "cuatro, siete": two utterances give a sentence break between the number and its digits.
 function callout(n) {
   if (n < 10) return [`${n}`];
   const digits = String(n)
     .split('')
     .map((d) => DIGIT_WORDS[Number(d)])
     .join(', ');
-  return [`${n}`, digits];
+  return [`${n}.`, digits];
 }
 
 function announce(n) {
   if (speech && !state.muted) {
-    speakParts(callout(n));
+    speak(callout(n));
     return;
   }
   // Screen readers only, when the voice is off. Clear first so "Repetir" re-announces the same text.
