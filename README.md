@@ -29,7 +29,8 @@ The interface text is in Spanish (Argentina).
 | `sw.js`                | Service worker: network first, with the cache as the offline fallback.  |
 | `manifest.webmanifest` | Home Screen app name, colors and icons.                                 |
 | `icons/`               | `icon.svg` (source and favicon) and the PNG sizes made from it.         |
-| `vercel.json`          | Security headers for the deployed site.                                 |
+| `.nojekyll`            | Tells GitHub Pages to serve the files as they are, without Jekyll.      |
+| `vercel.json`          | Security headers for the Vercel deployment.                             |
 | `.vercelignore`        | Allow-list of the files uploaded to Vercel (they are all public).      |
 
 ## Run locally
@@ -41,7 +42,20 @@ python3 -m http.server 5173
 Then open <http://localhost:5173>.
 
 - The service worker (offline support) is off on `localhost`, so it never caches other local dev servers. To test it, open <http://bingo.localhost:5173> instead.
-- The headers in `vercel.json` apply only on Vercel, not on this local server.
+- The security `<meta>` tags in `index.html` apply everywhere. The extra headers in `vercel.json` apply only on Vercel.
+
+## Deploy to GitHub Pages
+
+The site works on GitHub Pages as it is, at `https://gtfunes.github.io/very-simple-bingo/` or at a custom domain. All paths are relative, so no path changes are needed.
+
+1. Make the repository public. GitHub Pages on a private repository needs GitHub Pro or Team.
+2. Open **Settings → Pages** and set the source to **Deploy from a branch**, branch `main`, folder `/ (root)`.
+3. Each push to `main` publishes the site in about a minute.
+
+- Pages serves every tracked file, so `README.md` and `LICENSE` also get public URLs. There is nothing secret in the repository.
+- Pages caches each file for 10 minutes (`max-age=600`), so a phone can show the old version for up to 10 minutes after a deploy.
+- For a custom domain, add a `CNAME` DNS record from the subdomain to `gtfunes.github.io`, then set the domain in **Settings → Pages**. GitHub commits a `CNAME` file to the repository: keep it. Turn on **Enforce HTTPS**. Also verify the domain in your account settings (profile **Settings → Pages**), so nobody else can take it.
+- Saved games and Home Screen installs belong to one address. After a move to a new domain, players must add the app to the Home Screen again.
 
 ## Deploy to Vercel
 
@@ -69,12 +83,19 @@ pnpm dlx vercel deploy --prod
 
 The site is static: no backend, no accounts, no cookies, and no third-party scripts. Saved state goes into the page as text, never as HTML.
 
-`vercel.json` adds these headers:
+GitHub Pages cannot send custom headers, so `index.html` sets these with `<meta>` tags on every host:
 
-- A strict Content Security Policy: only files from the site itself, no inline scripts, no framing.
-- `X-Content-Type-Options`, `Referrer-Policy: no-referrer` and `Cross-Origin-Opener-Policy`.
+- A strict Content Security Policy: only files from the site itself, no inline scripts.
+- `referrer: no-referrer`.
+- `robots: noindex, nofollow`, so search engines skip the site. Delete it if you want the site indexed.
+
+On Vercel, `vercel.json` also sends the same policies as headers, plus the ones that have no `<meta>` form:
+
+- `frame-ancestors 'none'` and `X-Frame-Options`, so no other site can show the app in a frame.
+- `X-Content-Type-Options` and `Cross-Origin-Opener-Policy`.
 - A Permissions Policy that blocks camera, microphone, location, payments and USB.
-- `X-Robots-Tag: noindex`, so search engines skip the site. Delete it if you want the site indexed.
+
+On GitHub Pages these last protections are missing. The risk is low: the app has no accounts and no data worth stealing.
 
 ## Notes
 
