@@ -156,8 +156,8 @@ select:disabled {
   gap: 28px;
   max-width: 1200px;
   margin: 0 auto;
-  /* Leave room for the fixed action bar on phones. */
-  padding: 8px var(--gutter-right) calc(var(--bar-height) + 24px) var(--gutter-left);
+  /* Leave room for the fixed action bar on phones, with a clear gap under the last option. */
+  padding: 8px var(--gutter-right) calc(var(--bar-height) + 40px) var(--gutter-left);
 }
 
 /* Caller: ball, actions, history */
@@ -413,26 +413,34 @@ select:disabled {
 
 /* Options */
 
+/* A list of label | control rows. The divider spans the full width, the rows at most 420px. */
 .options {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding-top: 20px;
+  gap: 12px 14px;
+  padding: 20px max(0px, calc((100% - 420px) / 2)) 0;
   border-top: 1px solid var(--border);
 }
 
+/* Each label spans both columns and puts its text and control in the columns of .options. */
 .field {
-  display: inline-flex;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 8px;
   color: var(--muted);
 }
 
 .field select {
-  max-width: 62vw;
+  width: 100%;
   color: var(--text);
+}
+
+.options #reset {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 4px;
 }
 
 .check {
@@ -441,6 +449,7 @@ select:disabled {
 }
 
 .check input {
+  justify-self: start;
   width: 22px;
   height: 22px;
   margin: 0;
