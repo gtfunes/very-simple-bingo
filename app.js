@@ -68,6 +68,10 @@ const els = {
   announce: document.getElementById('announce'),
   draw: document.getElementById('draw'),
   repeat: document.getElementById('repeat'),
+  tools: document.getElementById('tools'),
+  undo: document.getElementById('undo'),
+  claimLine: document.getElementById('claim-line'),
+  claimBingo: document.getElementById('claim-bingo'),
   actions: document.querySelector('.actions'),
   history: document.getElementById('history'),
   board: document.getElementById('board'),
@@ -462,6 +466,60 @@ async function keepAwake() {
   }
 }
 
+// --- Sound effects ---------------------------------------------------------------
+// Made in the browser with Web Audio, so there are no audio files. They follow «Voz» on/off.
+
+let audio = null;
+
+// iOS only starts audio inside a tap, so this runs on every tap. After the first one it does nothing.
+function unlockAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  audio ??= new AudioContextClass();
+  if (audio.state !== 'running') audio.resume().catch(() => {});
+}
+
+function canPlaySound() {
+  return audio?.state === 'running' && !state.muted;
+}
+
+function tone(type, freq, start, length, volume, endFreq = freq) {
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, start);
+  if (endFreq !== freq) osc.frequency.exponentialRampToValueAtTime(endFreq, start + length);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(volume, start + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+  osc.connect(gain).connect(audio.destination);
+  osc.start(start);
+  osc.stop(start + length + 0.02);
+}
+
+// A short knock, like a ball hitting the drum. The roll plays one per number it shows.
+function knock() {
+  if (!canPlaySound()) return;
+  tone('triangle', 400 + Math.random() * 500, audio.currentTime, 0.06, 0.18, 110);
+}
+
+// Note frequencies (Hz): C5 E5 G5, then up to C6 for a bingo.
+const FANFARES = {
+  line: [523.25, 659.25, 783.99],
+  bingo: [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5],
+};
+
+function fanfare(kind) {
+  if (!canPlaySound()) return;
+  const notes = FANFARES[kind];
+  const step = 0.13;
+  const start = audio.currentTime + 0.02;
+  notes.forEach((freq, i) => {
+    const length = i === notes.length - 1 ? 0.55 : step * 0.9;
+    tone('square', freq, start + i * step, length, 0.1);
+  });
+}
+
 // --- Game ------------------------------------------------------------------
 
 function roll(pool) {
@@ -470,6 +528,7 @@ function roll(pool) {
   els.ball.classList.remove('empty');
   const timer = setInterval(() => {
     els.current.textContent = pool[randomIndex(pool.length)];
+    knock();
   }, 70);
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -518,7 +577,35 @@ async function draw() {
     });
   }
   navigator.vibrate?.(cardNews ? [40, 80, 160] : 40);
-  return announce(n, news);
+  const done = announce(n, news);
+  // The fanfare comes after the voice has said who won.
+  if (cardNews) Promise.resolve(done).then(() => fanfare(news.bingos.length ? 'bingo' : 'line'));
+  return done;
+}
+
+// For a mis-tap: the last ball goes back into the drum.
+function undoLast() {
+  const last = state.drawn.at(-1);
+  if (last === undefined || rolling) return;
+  if (!window.confirm(`¿Deshacer el ${last}? La bolilla vuelve al bolillero.`)) return;
+  stopAuto();
+  stopSpeech();
+  state.drawn.pop();
+  cardNews = '';
+  save();
+  render();
+}
+
+// Someone shouted "¡Línea!" or "¡Bingo!": pause the game so the host can check the card.
+function claim(kind) {
+  if (rolling) return;
+  stopAuto();
+  const word = kind === 'bingo' ? '¡Bingo!' : '¡Línea!';
+  cardNews = `${word} A revisar el cartón`;
+  render();
+  navigator.vibrate?.([40, 80, 160]);
+  const done = speech && !state.muted ? speak(`${word} A revisar el cartón.`) : Promise.resolve();
+  done.then(() => fanfare(kind));
 }
 
 function newGame(max = state.max) {
@@ -614,6 +701,10 @@ function render() {
   els.auto.setAttribute('aria-pressed', String(auto));
   els.auto.textContent = auto ? '⏸ Auto' : '▶ Auto';
   els.repeat.disabled = rolling || last === undefined || muted || !speech;
+  els.tools.hidden = last === undefined;
+  els.undo.disabled = rolling;
+  els.claimLine.disabled = rolling;
+  els.claimBingo.disabled = rolling;
   els.reset.disabled = rolling;
   els.max.disabled = rolling;
   els.max.value = String(max);
@@ -729,6 +820,14 @@ els.cardSet.addEventListener('change', () => {
   save();
   render();
 });
+
+els.undo.addEventListener('click', undoLast);
+els.claimLine.addEventListener('click', () => claim('line'));
+els.claimBingo.addEventListener('click', () => claim('bingo'));
+
+// Capture phase: runs before the button handlers, so the roll of that same tap already has sound.
+document.addEventListener('click', unlockAudio, true);
+document.addEventListener('keydown', unlockAudio, true);
 
 els.reset.addEventListener('click', () => {
   if (state.drawn.length && !window.confirm('¿Empezar un juego nuevo? Se borran las bolillas que salieron.')) return;

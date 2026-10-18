@@ -279,6 +279,25 @@ select:disabled {
   }
 }
 
+/* Deshacer, ¡Línea!, ¡Bingo!: smaller than the main buttons, and away from the thumb bar. */
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tools button {
+  padding-inline: 0.9rem;
+  font-size: 0.95rem;
+}
+
+.tools .claim {
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 700;
+}
+
 .history {
   display: flex;
   flex-direction: column;

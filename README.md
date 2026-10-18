@@ -8,6 +8,9 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 
 - Big "Sacar bolilla" button pinned to the bottom of the screen, within thumb reach.
 - Draws balls from 1–90 (default) or 1–75, with no repeats.
+- **↩ Deshacer** puts the last ball back in the drum after a mis-tap. It asks first.
+- **¡Línea!** and **¡Bingo!**: when a player shouts, tap one. Auto mode pauses, the voice says it and a fanfare plays, so the host can check the card against the board.
+- Sound effects: a knock for each number during the roll, and a fanfare for a line or a bingo. They are made in the browser with Web Audio (no audio files) and follow **Voz** on/off.
 - Auto mode (**▶ Auto**): draws a ball after each callout ends, until you tap **Pausar**. **Ritmo** sets the pause before the next ball: Tranqui (2 s), Normal (1.2 s) or Rápido (0.6 s), in `AUTO_PACES` in `app.js`. Auto mode pauses when the screen locks, when the voice does not start, when a card wins and when all balls are out.
 - Voice picker (**Voz**): the device's Spanish voices, the natural ones first, then the funny ones (on iPhone and Mac: Grandpa, Rocko, Flo…). **Estilo** changes the pitch and the speed: Normal, Ardilla, Monstruo or Apurado (`VOICE_STYLES` in `app.js`). A change plays a short sample only when nothing is being said, so it never cuts off a number.
 - Sayings (**Dichos**): a joke right after each number, by voice and on screen, such as "8, ¡el culo te abrocho!". Edit them in `SAYINGS` and `RHYMES` in `app.js`.
