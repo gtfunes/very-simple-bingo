@@ -33,6 +33,7 @@ The interface text is in Spanish (Argentina).
 | `index.html`           | Page markup and meta tags.                                              |
 | `styles.css`           | All styles. Phone layout first, two columns from 900 px wide.           |
 | `app.js`               | Game logic, voice, wake lock, tab sync and service worker registration. |
+| `analytics.js`         | Google Analytics: off until `GA_MEASUREMENT_ID` is set.                 |
 | `sw.js`                | Service worker: network first, with the cache as the offline fallback.  |
 | `manifest.webmanifest` | Home Screen app name, colors and icons.                                 |
 | `cards.json`           | Card sets: the numbers on each printed bingo card.                      |
@@ -100,13 +101,26 @@ The setup, done once:
 - `https://gtfunes.github.io/very-simple-bingo/` redirects to the custom domain.
 - Saved games and Home Screen installs belong to one address. After a move to a new domain, players must add the app to the Home Screen again.
 
+## Analytics
+
+Google Analytics 4 is wired in, but it stays off until the site has a measurement ID:
+
+1. In Google Analytics, add a web data stream for `bingo.gtfunes.com` and copy its measurement ID (`G-…`).
+2. Paste it into `GA_MEASUREMENT_ID` at the top of `analytics.js`, then push to `main`.
+
+- It never runs on `localhost`, `*.localhost` or LAN addresses, so local tests are not counted.
+- Besides the page views, it sends two events: `game_start` (the first ball, with the ball range and the card set) and `game_end` (a card with bingo or a tap on **¡Bingo!**, with the balls drawn). The events never include the names people type.
+- The ads features are off: ad cookies are denied by default (consent mode), and Google signals and ad personalization are disabled. To turn Google signals on, add the extra Google domains to the Content Security Policy first.
+- Google Analytics sets its own cookies (`_ga`). The site has no cookie banner, so it does not ask visitors for consent. Visitors in the EU or the UK would need one.
+- `analytics.js` is the same file in the bingo, generala and truco repositories. Only the ID line differs.
+
 ## Security
 
-The site is static: no backend, no accounts, no cookies, and no third-party scripts. Saved state goes into the page as text, never as HTML.
+The site is static: no backend and no accounts. The only third-party script is Google Analytics, and only once it has an ID (see [Analytics](#analytics)). Saved state goes into the page as text, never as HTML.
 
 GitHub Pages cannot send custom headers, so `index.html` sets these with `<meta>` tags:
 
-- A strict Content Security Policy: only files from the site itself, no inline scripts.
+- A strict Content Security Policy: only files from the site itself and the Google Analytics domains, no inline scripts.
 - `referrer: no-referrer`.
 - `robots: noindex, nofollow`, so search engines skip the site. Delete it if you want the site indexed.
 

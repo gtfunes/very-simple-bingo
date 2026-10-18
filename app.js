@@ -122,6 +122,8 @@ let cells = [];
 let cardSets = [];
 // "¡Línea! Cartón 12", for the ball on screen only: Repetir and tab sync never announce it again.
 let cardNews = '';
+// Analytics: one "game_end" per game, so a card bingo and then the host's «¡Bingo!» count once.
+let gameEndTracked = false;
 
 // --- State -----------------------------------------------------------------
 
@@ -572,6 +574,7 @@ async function draw() {
   const before = cardResults(new Set(state.drawn));
   state.drawn.push(n);
   save();
+  if (state.drawn.length === 1) window.track?.('game_start', { balls: state.max, card_set: state.cardSet || 'none' });
   const after = cardResults(new Set(state.drawn));
   const news = {
     lines: after.lines.filter((card) => !before.lines.includes(card)),
@@ -585,6 +588,7 @@ async function draw() {
     .join(' · ');
   // Someone won something: stop auto mode, so the host can check the card.
   if (cardNews) stopAuto();
+  if (news.bingos.length) trackGameEnd('card');
   render();
   if (!reducedMotion.matches) {
     els.ball.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], {
@@ -612,10 +616,17 @@ function undoLast() {
   render();
 }
 
+function trackGameEnd(source) {
+  if (gameEndTracked) return;
+  gameEndTracked = true;
+  window.track?.('game_end', { source, balls_drawn: state.drawn.length });
+}
+
 // Someone shouted "¡Línea!" or "¡Bingo!": pause the game so the host can check the card.
 function claim(kind) {
   if (rolling) return;
   stopAuto();
+  if (kind === 'bingo') trackGameEnd('claim');
   const word = kind === 'bingo' ? '¡Bingo!' : '¡Línea!';
   cardNews = `${word} A revisar el cartón`;
   render();
@@ -629,6 +640,7 @@ function newGame(max = state.max) {
   stopSpeech();
   voiceProblem = false;
   cardNews = '';
+  gameEndTracked = false;
   state = { ...state, max, drawn: [] };
   save();
   buildBoard();
