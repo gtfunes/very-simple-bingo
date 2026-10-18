@@ -2,8 +2,12 @@ const STORAGE_KEY = 'bolillero:v1';
 const BALL_OPTIONS = [75, 90];
 const DEFAULT_MAX = 90;
 const ROLL_MS = 800;
-// Auto mode: wait this long after a callout ends before the next draw.
-const AUTO_PAUSE_MS = 2000;
+// Auto mode («Ritmo»): how long to wait after a callout ends before the next draw.
+const AUTO_PACES = {
+  tranqui: { label: 'Tranqui', pauseMs: 2000 },
+  normal: { label: 'Normal', pauseMs: 1200 },
+  rapido: { label: 'Rápido', pauseMs: 600 },
+};
 const HISTORY_SIZE = 5;
 const VOICE_TIMEOUT_MS = 2500;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
@@ -77,6 +81,7 @@ const els = {
   voice: document.getElementById('voice'),
   styleField: document.getElementById('style-field'),
   style: document.getElementById('style'),
+  pace: document.getElementById('pace'),
   sayings: document.getElementById('sayings'),
   cardNews: document.getElementById('card-news'),
   cards: document.getElementById('cards'),
@@ -126,6 +131,7 @@ function readSaved() {
         muted: Boolean(saved.muted),
         voice: typeof saved.voice === 'string' ? saved.voice : '',
         style: Object.hasOwn(VOICE_STYLES, saved.style) ? saved.style : 'normal',
+        pace: Object.hasOwn(AUTO_PACES, saved.pace) ? saved.pace : 'normal',
         sayings: Boolean(saved.sayings),
         cardSet: typeof saved.cardSet === 'string' ? saved.cardSet : '',
       };
@@ -138,7 +144,16 @@ function readSaved() {
 
 function load() {
   return (
-    readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false, voice: '', style: 'normal', sayings: false, cardSet: '' }
+    readSaved() ?? {
+      max: DEFAULT_MAX,
+      drawn: [],
+      muted: false,
+      voice: '',
+      style: 'normal',
+      pace: 'normal',
+      sayings: false,
+      cardSet: '',
+    }
   );
 }
 
@@ -541,7 +556,7 @@ async function autoStep(run) {
   if (run !== autoRun) return;
   await draw();
   if (run !== autoRun) return;
-  autoTimer = setTimeout(() => autoStep(run), AUTO_PAUSE_MS);
+  autoTimer = setTimeout(() => autoStep(run), AUTO_PACES[state.pace].pauseMs);
 }
 
 // The big button draws a ball, or pauses auto mode while it runs.
@@ -609,6 +624,7 @@ function render() {
   els.styleField.hidden = !speech;
   els.voice.value = voice && voice.voiceURI === state.voice ? state.voice : '';
   els.style.value = state.style;
+  els.pace.value = state.pace;
   els.sayings.checked = state.sayings;
   const saying = state.sayings && !rolling && last !== undefined ? sayingFor(last) : '';
   els.saying.textContent = saying;
@@ -692,6 +708,12 @@ els.style.addEventListener('change', () => {
   previewVoice();
 });
 
+// A running auto mode picks up the new pace from its next pause.
+els.pace.addEventListener('change', () => {
+  state.pace = els.pace.value;
+  save();
+});
+
 els.sayings.addEventListener('change', () => {
   state.sayings = els.sayings.checked;
   save();
@@ -752,6 +774,7 @@ new ResizeObserver(() => {
 }).observe(els.actions);
 
 els.style.append(...Object.entries(VOICE_STYLES).map(([key, { label }]) => new Option(label, key)));
+els.pace.append(...Object.entries(AUTO_PACES).map(([key, { label }]) => new Option(label, key)));
 
 function onVoicesChanged() {
   pickVoice();
