@@ -89,6 +89,7 @@ const els = {
   sayings: document.getElementById('sayings'),
   cardNews: document.getElementById('card-news'),
   cards: document.getElementById('cards'),
+  cardsSetName: document.getElementById('cards-set-name'),
   cardsEmpty: document.getElementById('cards-empty'),
   cardsBingoRow: document.getElementById('cards-bingo-row'),
   cardsBingo: document.getElementById('cards-bingo'),
@@ -395,14 +396,26 @@ function validCard(card) {
   );
 }
 
+// A set printed in several colors gives each card a `color` ("violeta"), so the label says which
+// physical card it is: "17 violeta". The set's `colors` map names to the hex shown on the chips.
 function parseCardSets(data) {
   const sets = Array.isArray(data?.sets) ? data.sets : [];
+  const hexOf = (value) => (typeof value === 'string' && /^#[0-9a-f]{3,8}$/i.test(value) ? value : '');
   return sets
     .filter((set) => set && typeof set.id === 'string' && set.id && Array.isArray(set.cards))
     .map((set) => ({
       id: set.id,
       name: typeof set.name === 'string' && set.name ? set.name : set.id,
-      cards: set.cards.filter(validCard).map((card) => ({ id: String(card.id), rows: card.rows })),
+      // The ball range the cards were printed for (1–90 or 1–75); null lets the host pick.
+      max: BALL_OPTIONS.includes(set.max) ? set.max : null,
+      cards: set.cards.filter(validCard).map((card) => {
+        const color = typeof card.color === 'string' ? card.color : '';
+        return {
+          label: color ? `${card.id} ${color}` : String(card.id),
+          hex: color ? hexOf(set.colors?.[color]) : '',
+          rows: card.rows,
+        };
+      }),
     }))
     .filter((set) => set.cards.length > 0);
 }
@@ -417,6 +430,9 @@ async function loadCardSets() {
     return;
   }
   els.cardSet.replaceChildren(new Option('Ninguno', ''), ...cardSets.map((set) => new Option(set.name, set.id)));
+  // A saved game whose range no longer matches its set: fix it while no ball is out yet.
+  const set = selectedSet();
+  if (set?.max && set.max !== state.max && state.drawn.length === 0) newGame(set.max);
   render();
 }
 
@@ -424,14 +440,14 @@ function selectedSet() {
   return cardSets.find((set) => set.id === state.cardSet) ?? null;
 }
 
-// Card ids with every number out (bingos), and with at least one full row but not all (lines).
+// Cards with every number out (bingos), and with at least one full row but not all (lines).
 function cardResults(drawnSet) {
   const lines = [];
   const bingos = [];
   selectedSet()?.cards.forEach((card) => {
     const fullRows = card.rows.filter((row) => row.every((n) => drawnSet.has(n))).length;
-    if (fullRows === card.rows.length) bingos.push(card.id);
-    else if (fullRows > 0) lines.push(card.id);
+    if (fullRows === card.rows.length) bingos.push(card);
+    else if (fullRows > 0) lines.push(card);
   });
   return { lines, bingos };
 }
@@ -445,8 +461,8 @@ function listOf(items) {
 }
 
 // "el cartón 12" or "los cartones 12 y 45".
-function cardsWord(ids, one, many) {
-  return `${ids.length > 1 ? many : one} ${listOf(ids)}`;
+function cardsWord(cards, one, many) {
+  return `${cards.length > 1 ? many : one} ${listOf(cards.map((card) => card.label))}`;
 }
 
 // --- Screen wake lock --------------------------------------------------------
@@ -558,8 +574,8 @@ async function draw() {
   save();
   const after = cardResults(new Set(state.drawn));
   const news = {
-    lines: after.lines.filter((id) => !before.lines.includes(id)),
-    bingos: after.bingos.filter((id) => !before.bingos.includes(id)),
+    lines: after.lines.filter((card) => !before.lines.includes(card)),
+    bingos: after.bingos.filter((card) => !before.bingos.includes(card)),
   };
   cardNews = [
     news.bingos.length ? `¡Bingo! ${cardsWord(news.bingos, 'Cartón', 'Cartones')}` : '',
@@ -706,7 +722,8 @@ function render() {
   els.claimLine.disabled = rolling;
   els.claimBingo.disabled = rolling;
   els.reset.disabled = rolling;
-  els.max.disabled = rolling;
+  // A picked card set fixes the ball range.
+  els.max.disabled = rolling || Boolean(selectedSet()?.max);
   els.max.value = String(max);
 
   els.mute.hidden = !speech;
@@ -733,12 +750,15 @@ function render() {
   els.cards.hidden = !set;
   if (set) {
     const { lines, bingos } = cardResults(drawnSet);
-    const chips = (ids) =>
-      ids.map((id) => {
+    const chips = (cards) =>
+      cards.map((card) => {
         const li = document.createElement('li');
-        li.textContent = id;
+        li.textContent = card.label;
+        // A dot in the card's print color, set through CSSOM (the CSP allows it, unlike a style attribute).
+        if (card.hex) li.style.setProperty('--card-color', card.hex);
         return li;
       });
+    els.cardsSetName.textContent = set.name;
     els.cardsEmpty.hidden = lines.length + bingos.length > 0;
     els.cardsBingoRow.hidden = bingos.length === 0;
     els.cardsBingo.replaceChildren(...chips(bingos));
@@ -814,7 +834,19 @@ els.sayings.addEventListener('change', () => {
   render();
 });
 
+// A set only works with the ball range its cards were printed for, so picking it sets «Bolillas».
 els.cardSet.addEventListener('change', () => {
+  const set = cardSets.find((s) => s.id === els.cardSet.value);
+  if (set?.max && set.max !== state.max) {
+    const message = `Estos cartones son de 1 a ${set.max}. Cambiar las bolillas empieza un juego nuevo. ¿Seguimos?`;
+    if (state.drawn.length && !window.confirm(message)) {
+      els.cardSet.value = selectedSet()?.id ?? '';
+      return;
+    }
+    state.cardSet = set.id;
+    newGame(set.max);
+    return;
+  }
   state.cardSet = els.cardSet.value;
   cardNews = '';
   save();

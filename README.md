@@ -14,7 +14,7 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 - Auto mode (**▶ Auto**): draws a ball after each callout ends, until you tap **Pausar**. **Ritmo** sets the pause before the next ball: Tranqui (2 s), Normal (1.2 s) or Rápido (0.6 s), in `AUTO_PACES` in `app.js`. Auto mode pauses when the screen locks, when the voice does not start, when a card wins and when all balls are out.
 - Voice picker (**Voz**): the device's Spanish voices, the natural ones first, then the funny ones (on iPhone and Mac: Grandpa, Rocko, Flo…). **Estilo** changes the pitch and the speed: Normal, Ardilla, Monstruo or Apurado (`VOICE_STYLES` in `app.js`). A change plays a short sample only when nothing is being said, so it never cuts off a number.
 - Sayings (**Dichos**): a joke right after each number, by voice and on screen, such as "8, ¡el culo te abrocho!". Edit them in `SAYINGS` and `RHYMES` in `app.js`.
-- Card sets (**Cartones**): pick the set of printed cards you play with, and the app shows and says which cards have a line or a bingo after each ball. Auto mode pauses when a card wins. See [Card sets](#card-sets).
+- Card sets (**Cartones**): pick the set of printed cards you play with, and the app shows and says which cards (number and color) have a line or a bingo after each ball. Auto mode pauses when a card wins. See [Card sets](#card-sets).
 - Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Both parts are queued together, because phones clip the start of speech that follows a silence.
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
@@ -44,14 +44,18 @@ The interface text is in Spanish (Argentina).
 
 `cards.json` holds sets of real, printed bingo cards. The cards are transcribed from photos, not read on the device. A set is useful only to people who play with the same printed cards. When the file has no sets, the **Cartones** picker and the card results stay hidden.
 
+The file has one set today: **Chino**, 24 cards from 1 to 90, printed in three colors (violeta, naranja, azul). Its cards are irregular: rows have 3 to 7 numbers, and card 16 naranja has 45 twice. The file keeps them exactly as printed.
+
 ```json
 {
   "sets": [
     {
-      "id": "casa",
-      "name": "Cartones de casa",
+      "id": "chino",
+      "name": "Chino",
+      "max": 90,
+      "colors": { "violeta": "#8e3fa8", "naranja": "#f0642c", "azul": "#2b93d6" },
       "cards": [
-        { "id": "0123", "rows": [[3, 15, 42, 60, 81], [7, 22, 38, 55, 76], [9, 28, 47, 69, 90]] }
+        { "id": "17", "color": "violeta", "rows": [[7, 88, 56, 75], [14, 36, 48, 59, 61, 82], [3, 25, 32, 63, 85]] }
       ]
     }
   ]
@@ -60,7 +64,10 @@ The interface text is in Spanish (Argentina).
 
 - `id` of a set: a short name that does not change. The app saves it to remember the picked set.
 - `name`: the text in the **Cartones** picker.
-- `id` of a card: the serial number printed on the card, as text, so leading zeros stay.
+- `max` (optional): the ball range the cards were printed for, `90` or `75`. Picking the set switches **Bolillas** to it and locks it. If balls are already out, the app asks first, because the change starts a new game.
+- `colors` (optional): for a set printed in several colors, each color name with the hex color of its dot on screen.
+- `id` of a card: the number printed on the card, as text and without leading zeros, so the voice says "cinco" and not "cero cinco".
+- `color` of a card (optional): one of the names in `colors`. The app then names the card with it: "¡Línea en el cartón 17 violeta!".
 - `rows`: the numbers of each row, from left to right. A line is one full row. A bingo is every number on the card.
 
 To add a set, take clear photos of the cards (the serial number must be readable) and ask Claude to transcribe them into `cards.json`. Check a few cards against the photos before game night.
