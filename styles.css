@@ -30,6 +30,9 @@ body {
 
 html {
   background-color: var(--bg);
+  /* iOS Safari enlarges text in landscape unless told not to. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* Keeps pinch zoom but drops double-tap zoom, so fast taps never zoom the page. */
   touch-action: manipulation;
 }
