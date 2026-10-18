@@ -11,6 +11,7 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 - Auto mode (**▶ Auto**): draws a ball 2 seconds after each callout ends, until you tap **Pausar**. It pauses when the screen locks and when all balls are out. Change the pause with `AUTO_PAUSE_MS` in `app.js`.
 - Voice picker (**Voz**): the device's Spanish voices, the natural ones first, then the funny ones (on iPhone and Mac: Grandpa, Rocko, Flo…). **Estilo** changes the pitch and the speed: Normal, Ardilla, Monstruo or Apurado (`VOICE_STYLES` in `app.js`).
 - Sayings (**Dichos**): a joke right after each number, by voice and on screen, such as "8, ¡el culo te abrocho!". Edit them in `SAYINGS` and `RHYMES` in `app.js`.
+- Card sets (**Cartones**): pick the set of printed cards you play with, and the app shows and says which cards have a line or a bingo after each ball. Auto mode pauses when a card wins. See [Card sets](#card-sets).
 - Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Both parts are queued together, because phones clip the start of speech that follows a silence.
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
@@ -31,10 +32,36 @@ The interface text is in Spanish (Argentina).
 | `app.js`               | Game logic, voice, wake lock, tab sync and service worker registration. |
 | `sw.js`                | Service worker: network first, with the cache as the offline fallback.  |
 | `manifest.webmanifest` | Home Screen app name, colors and icons.                                 |
+| `cards.json`           | Card sets: the numbers on each printed bingo card.                      |
 | `icons/`               | `icon.svg` (source and favicon) and the PNG sizes made from it.         |
 | `.nojekyll`            | Tells GitHub Pages to serve the files as they are, without Jekyll.      |
 | `vercel.json`          | Security headers for the Vercel deployment.                             |
 | `.vercelignore`        | Allow-list of the files uploaded to Vercel (they are all public).      |
+
+## Card sets
+
+`cards.json` holds sets of real, printed bingo cards. The cards are transcribed from photos, not read on the device. A set is useful only to people who play with the same printed cards. When the file has no sets, the **Cartones** picker and the card results stay hidden.
+
+```json
+{
+  "sets": [
+    {
+      "id": "casa",
+      "name": "Cartones de casa",
+      "cards": [
+        { "id": "0123", "rows": [[3, 15, 42, 60, 81], [7, 22, 38, 55, 76], [9, 28, 47, 69, 90]] }
+      ]
+    }
+  ]
+}
+```
+
+- `id` of a set: a short name that does not change. The app saves it to remember the picked set.
+- `name`: the text in the **Cartones** picker.
+- `id` of a card: the serial number printed on the card, as text, so leading zeros stay.
+- `rows`: the numbers of each row, from left to right. A line is one full row. A bingo is every number on the card.
+
+To add a set, take clear photos of the cards (the serial number must be readable) and ask Claude to transcribe them into `cards.json`. Check a few cards against the photos before game night.
 
 ## Run locally
 

@@ -106,6 +106,11 @@ select:disabled {
   cursor: not-allowed;
 }
 
+/* Classes below set "display", which would otherwise beat the hidden attribute. */
+[hidden] {
+  display: none !important;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -220,6 +225,17 @@ select:disabled {
   text-wrap: balance;
 }
 
+.card-news {
+  margin: 0;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .status {
   margin: 0;
   min-height: 1.4em;
@@ -291,6 +307,58 @@ select:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* Cards with a line or bingo */
+
+.cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.cards-empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.cards-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cards-label {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chips li {
+  min-width: 44px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.chips.bingo li {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: var(--on-gold);
+}
+
 /* Board */
 
 .board-wrap {
@@ -360,10 +428,6 @@ select:disabled {
   align-items: center;
   gap: 8px;
   color: var(--muted);
-}
-
-.field[hidden] {
-  display: none;
 }
 
 .field select {

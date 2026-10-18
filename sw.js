@@ -8,6 +8,7 @@ const ASSETS = [
   'styles.css',
   'app.js',
   'manifest.webmanifest',
+  'cards.json',
   'icons/icon.svg',
   'icons/icon-180.png',
   'icons/icon-192.png',

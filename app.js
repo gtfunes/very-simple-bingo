@@ -78,6 +78,15 @@ const els = {
   styleField: document.getElementById('style-field'),
   style: document.getElementById('style'),
   sayings: document.getElementById('sayings'),
+  cardNews: document.getElementById('card-news'),
+  cards: document.getElementById('cards'),
+  cardsEmpty: document.getElementById('cards-empty'),
+  cardsBingoRow: document.getElementById('cards-bingo-row'),
+  cardsBingo: document.getElementById('cards-bingo'),
+  cardsLineRow: document.getElementById('cards-line-row'),
+  cardsLine: document.getElementById('cards-line'),
+  cardSetField: document.getElementById('card-set-field'),
+  cardSet: document.getElementById('card-set'),
 };
 
 const speech = 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -100,6 +109,9 @@ let autoTimer = null;
 let wakeLock = null;
 let wakeLockPending = false;
 let cells = [];
+let cardSets = [];
+// "¡Línea! Cartón 12", for the ball on screen only: Repetir and tab sync never announce it again.
+let cardNews = '';
 
 // --- State -----------------------------------------------------------------
 
@@ -115,6 +127,7 @@ function readSaved() {
         voice: typeof saved.voice === 'string' ? saved.voice : '',
         style: Object.hasOwn(VOICE_STYLES, saved.style) ? saved.style : 'normal',
         sayings: Boolean(saved.sayings),
+        cardSet: typeof saved.cardSet === 'string' ? saved.cardSet : '',
       };
     }
   } catch {
@@ -124,7 +137,9 @@ function readSaved() {
 }
 
 function load() {
-  return readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false, voice: '', style: 'normal', sayings: false };
+  return (
+    readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false, voice: '', style: 'normal', sayings: false, cardSet: '' }
+  );
 }
 
 function save() {
@@ -327,13 +342,85 @@ function previewVoice() {
 }
 
 // Resolves when the callout is over (at once when the voice is off).
-function announce(n) {
-  if (speech && !state.muted) return speak(callout(n));
+// `news` holds the cards that just got a line or bingo with this ball.
+function announce(n, news = { lines: [], bingos: [] }) {
+  const said = [];
+  if (news.bingos.length) said.push(`¡Bingo en ${cardsWord(news.bingos, 'el cartón', 'los cartones')}!`);
+  if (news.lines.length) said.push(`¡Línea en ${cardsWord(news.lines, 'el cartón', 'los cartones')}!`);
+  if (speech && !state.muted) return speak([...callout(n), ...said]);
   // Screen readers only, when the voice is off. Clear first so "Repetir" re-announces the same text.
   els.announce.textContent = '';
   requestAnimationFrame(() => {
-    els.announce.textContent = `Salió el ${n}`;
+    els.announce.textContent = [`Salió el ${n}.`, ...said].join(' ');
   });
+}
+
+// --- Card sets ---------------------------------------------------------------
+// cards.json holds sets of real bingo cards (transcribed from photos). With a set picked in
+// «Cartones», the app shows which cards have a full row (línea) or every number out (bingo).
+
+function validCard(card) {
+  return (
+    card &&
+    (typeof card.id === 'string' || Number.isInteger(card.id)) &&
+    Array.isArray(card.rows) &&
+    card.rows.length > 0 &&
+    card.rows.every((row) => Array.isArray(row) && row.length > 0 && row.every((n) => Number.isInteger(n) && n >= 1))
+  );
+}
+
+function parseCardSets(data) {
+  const sets = Array.isArray(data?.sets) ? data.sets : [];
+  return sets
+    .filter((set) => set && typeof set.id === 'string' && set.id && Array.isArray(set.cards))
+    .map((set) => ({
+      id: set.id,
+      name: typeof set.name === 'string' && set.name ? set.name : set.id,
+      cards: set.cards.filter(validCard).map((card) => ({ id: String(card.id), rows: card.rows })),
+    }))
+    .filter((set) => set.cards.length > 0);
+}
+
+async function loadCardSets() {
+  try {
+    const response = await fetch('cards.json');
+    if (!response.ok) return;
+    cardSets = parseCardSets(await response.json());
+  } catch {
+    // Offline before the first visit, or a broken file: the game works without cards.
+    return;
+  }
+  els.cardSet.replaceChildren(new Option('Ninguno', ''), ...cardSets.map((set) => new Option(set.name, set.id)));
+  render();
+}
+
+function selectedSet() {
+  return cardSets.find((set) => set.id === state.cardSet) ?? null;
+}
+
+// Card ids with every number out (bingos), and with at least one full row but not all (lines).
+function cardResults(drawnSet) {
+  const lines = [];
+  const bingos = [];
+  selectedSet()?.cards.forEach((card) => {
+    const fullRows = card.rows.filter((row) => row.every((n) => drawnSet.has(n))).length;
+    if (fullRows === card.rows.length) bingos.push(card.id);
+    else if (fullRows > 0) lines.push(card.id);
+  });
+  return { lines, bingos };
+}
+
+function listOf(items) {
+  try {
+    return new Intl.ListFormat('es', { type: 'conjunction' }).format(items);
+  } catch {
+    return items.join(', ');
+  }
+}
+
+// "el cartón 12" or "los cartones 12 y 45".
+function cardsWord(ids, one, many) {
+  return `${ids.length > 1 ? many : one} ${listOf(ids)}`;
 }
 
 // --- Screen wake lock --------------------------------------------------------
@@ -380,12 +467,27 @@ async function draw() {
   const n = pool[randomIndex(pool.length)];
 
   rolling = true;
+  cardNews = '';
   render();
   await roll(pool);
   rolling = false;
 
+  const before = cardResults(new Set(state.drawn));
   state.drawn.push(n);
   save();
+  const after = cardResults(new Set(state.drawn));
+  const news = {
+    lines: after.lines.filter((id) => !before.lines.includes(id)),
+    bingos: after.bingos.filter((id) => !before.bingos.includes(id)),
+  };
+  cardNews = [
+    news.bingos.length ? `¡Bingo! ${cardsWord(news.bingos, 'Cartón', 'Cartones')}` : '',
+    news.lines.length ? `¡Línea! ${cardsWord(news.lines, 'Cartón', 'Cartones')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  // Someone won something: stop auto mode, so the host can check the card.
+  if (cardNews) stopAuto();
   render();
   if (!reducedMotion.matches) {
     els.ball.animate([{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }], {
@@ -393,14 +495,15 @@ async function draw() {
       easing: 'ease-out',
     });
   }
-  navigator.vibrate?.(40);
-  return announce(n);
+  navigator.vibrate?.(cardNews ? [40, 80, 160] : 40);
+  return announce(n, news);
 }
 
 function newGame(max = state.max) {
   stopAuto();
   stopSpeech();
   voiceProblem = false;
+  cardNews = '';
   state = { ...state, max, drawn: [] };
   save();
   buildBoard();
@@ -507,6 +610,28 @@ function render() {
   els.saying.textContent = saying;
   els.saying.hidden = !saying;
 
+  const set = selectedSet();
+  const news = rolling ? '' : cardNews;
+  els.cardNews.textContent = news;
+  els.cardNews.hidden = !news;
+  els.cardSetField.hidden = cardSets.length === 0;
+  els.cardSet.value = set ? set.id : '';
+  els.cards.hidden = !set;
+  if (set) {
+    const { lines, bingos } = cardResults(drawnSet);
+    const chips = (ids) =>
+      ids.map((id) => {
+        const li = document.createElement('li');
+        li.textContent = id;
+        return li;
+      });
+    els.cardsEmpty.hidden = lines.length + bingos.length > 0;
+    els.cardsBingoRow.hidden = bingos.length === 0;
+    els.cardsBingo.replaceChildren(...chips(bingos));
+    els.cardsLineRow.hidden = lines.length === 0;
+    els.cardsLine.replaceChildren(...chips(lines));
+  }
+
   els.history.replaceChildren(
     ...drawn
       .slice(-HISTORY_SIZE - 1, -1)
@@ -565,6 +690,13 @@ els.style.addEventListener('change', () => {
 
 els.sayings.addEventListener('change', () => {
   state.sayings = els.sayings.checked;
+  save();
+  render();
+});
+
+els.cardSet.addEventListener('change', () => {
+  state.cardSet = els.cardSet.value;
+  cardNews = '';
   save();
   render();
 });
@@ -636,3 +768,4 @@ if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(locatio
 
 buildBoard();
 render();
+loadCardSets();

@@ -5,6 +5,7 @@
 !app.js
 !sw.js
 !manifest.webmanifest
+!cards.json
 !icons
 !icons/**
 !vercel.json

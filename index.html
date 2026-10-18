@@ -37,6 +37,7 @@
           <span class="ball-number" id="current">–</span>
         </div>
         <p class="saying" id="saying" hidden></p>
+        <p class="card-news" id="card-news" hidden></p>
         <p class="status" id="status"></p>
         <p class="sr-only" id="announce" aria-live="polite" aria-atomic="true"></p>
 
@@ -48,6 +49,19 @@
         <div class="history">
           <h2>Anteriores</h2>
           <ol id="history" class="history-list"></ol>
+        </div>
+
+        <div class="cards" id="cards" hidden>
+          <h2>Cartones</h2>
+          <p class="cards-empty" id="cards-empty">Nadie tiene línea todavía</p>
+          <div class="cards-row" id="cards-bingo-row">
+            <span class="cards-label">Bingo</span>
+            <ol class="chips bingo" id="cards-bingo"></ol>
+          </div>
+          <div class="cards-row" id="cards-line-row">
+            <span class="cards-label">Línea</span>
+            <ol class="chips" id="cards-line"></ol>
+          </div>
         </div>
       </section>
 
@@ -78,6 +92,12 @@
         <label class="field check">
           <input type="checkbox" id="sayings" />
           Dichos
+        </label>
+        <label class="field" id="card-set-field" hidden>
+          Cartones
+          <select id="card-set">
+            <option value="">Ninguno</option>
+          </select>
         </label>
       </section>
     </main>
