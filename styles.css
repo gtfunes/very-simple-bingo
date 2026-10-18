@@ -129,6 +129,21 @@ select:disabled {
   padding: calc(12px + var(--safe-top)) var(--gutter-right) 4px var(--gutter-left);
 }
 
+.toggles {
+  display: flex;
+  gap: 8px;
+}
+
+.toggles button {
+  padding-inline: 0.85rem;
+  white-space: nowrap;
+}
+
+#auto[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
 /* Layout */
 
 .app {

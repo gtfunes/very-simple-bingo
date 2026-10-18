@@ -2,6 +2,8 @@ const STORAGE_KEY = 'bolillero:v1';
 const BALL_OPTIONS = [75, 90];
 const DEFAULT_MAX = 90;
 const ROLL_MS = 800;
+// Auto mode: wait this long after a callout ends before the next draw.
+const AUTO_PAUSE_MS = 2000;
 const HISTORY_SIZE = 5;
 const VOICE_TIMEOUT_MS = 2500;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
@@ -22,6 +24,7 @@ const els = {
   count: document.getElementById('count'),
   max: document.getElementById('max'),
   mute: document.getElementById('mute'),
+  auto: document.getElementById('auto'),
   reset: document.getElementById('reset'),
 };
 
@@ -34,7 +37,14 @@ let voice = null;
 let utterances = [];
 let speakTimer = null;
 let voiceTimer = null;
+// Resolves the promise that speak() returned, once that speech ends, fails or is replaced.
+let finishSpeech = null;
+let speechDone = Promise.resolve();
 let voiceProblem = false;
+let auto = false;
+// Bumped on every auto mode change, so a loop from an earlier run stops at its next step.
+let autoRun = 0;
+let autoTimer = null;
 let wakeLock = null;
 let wakeLockPending = false;
 let cells = [];
@@ -110,10 +120,16 @@ function setVoiceProblem(value) {
   render();
 }
 
+function settleSpeech() {
+  finishSpeech?.();
+  finishSpeech = null;
+}
+
 function stopSpeech() {
   clearTimeout(speakTimer);
   clearTimeout(voiceTimer);
   utterances = [];
+  settleSpeech();
   speech?.cancel();
 }
 
@@ -123,29 +139,41 @@ function makeUtterance(text, volume) {
   if (voice) utterance.voice = voice;
   utterance.rate = 0.9;
   utterance.volume = volume;
-  if (volume > 0) {
-    utterance.onerror = (event) => {
-      if (event.error === 'interrupted' || event.error === 'canceled') return;
-      clearTimeout(voiceTimer);
-      setVoiceProblem(true);
-    };
-  }
+  utterance.onerror = (event) => {
+    // Errors from speech that was already replaced or stopped do not matter.
+    if (!utterances.includes(utterance)) return;
+    settleSpeech();
+    if (volume === 0 || event.error === 'interrupted' || event.error === 'canceled') return;
+    clearTimeout(voiceTimer);
+    setVoiceProblem(true);
+  };
   return utterance;
 }
 
 // Queues all the parts at once, so the audio never goes idle between them: phones clip the start
 // of speech that comes after a silence, and a short first digit ("cuatro") could vanish.
+// Returns a promise that resolves when the speech ends, fails, never starts or is replaced.
 function speak(parts, volume = 1) {
-  if (!speech) return;
+  if (!speech) return Promise.resolve();
   if (!voice) pickVoice();
+  settleSpeech();
   // Kept in a module variable: Chrome can garbage-collect a local utterance before its events fire.
   const queue = [parts].flat().map((text) => makeUtterance(text, volume));
   utterances = queue;
+  speechDone = new Promise((resolve) => {
+    finishSpeech = resolve;
+  });
+  queue.at(-1).onend = () => {
+    if (utterances === queue) settleSpeech();
+  };
 
   if (volume > 0) {
     // If the voice never starts (iOS did not unlock it, no Spanish voice…), tell the host.
     clearTimeout(voiceTimer);
-    voiceTimer = setTimeout(() => setVoiceProblem(true), VOICE_TIMEOUT_MS);
+    voiceTimer = setTimeout(() => {
+      setVoiceProblem(true);
+      settleSpeech();
+    }, VOICE_TIMEOUT_MS);
     queue[0].onstart = () => {
       clearTimeout(voiceTimer);
       setVoiceProblem(false);
@@ -163,6 +191,7 @@ function speak(parts, volume = 1) {
   } else {
     start();
   }
+  return speechDone;
 }
 
 // iOS only lets a page speak after a speak() call inside a user gesture.
@@ -182,11 +211,9 @@ function callout(n) {
   return [`${n}.`, digits];
 }
 
+// Resolves when the callout is over (at once when the voice is off).
 function announce(n) {
-  if (speech && !state.muted) {
-    speak(callout(n));
-    return;
-  }
+  if (speech && !state.muted) return speak(callout(n));
   // Screen readers only, when the voice is off. Clear first so "Repetir" re-announces the same text.
   els.announce.textContent = '';
   requestAnimationFrame(() => {
@@ -252,16 +279,57 @@ async function draw() {
     });
   }
   navigator.vibrate?.(40);
-  announce(n);
+  return announce(n);
 }
 
 function newGame(max = state.max) {
+  stopAuto();
   stopSpeech();
   voiceProblem = false;
   state = { ...state, max, drawn: [] };
   save();
   buildBoard();
   render();
+}
+
+// --- Auto mode -------------------------------------------------------------
+
+function stopAuto() {
+  auto = false;
+  autoRun += 1;
+  clearTimeout(autoTimer);
+}
+
+// Called from a tap: the first draw starts right away, still inside the gesture, so iOS unlocks speech.
+function startAuto() {
+  stopAuto();
+  auto = true;
+  autoStep(autoRun);
+}
+
+async function autoStep(run) {
+  if (run !== autoRun) return;
+  if (remaining().length === 0) {
+    stopAuto();
+    render();
+    return;
+  }
+  // Let speech in progress (a callout, "Repetir") finish before the next ball.
+  if (finishSpeech) await speechDone;
+  if (run !== autoRun) return;
+  await draw();
+  if (run !== autoRun) return;
+  autoTimer = setTimeout(() => autoStep(run), AUTO_PAUSE_MS);
+}
+
+// The big button draws a ball, or pauses auto mode while it runs.
+function onDrawButton() {
+  if (auto) {
+    stopAuto();
+    render();
+  } else {
+    draw();
+  }
 }
 
 // --- Rendering -------------------------------------------------------------
@@ -295,11 +363,16 @@ function render() {
   else if (voiceProblem && !muted) els.status.textContent = '¿No se escucha? Subí el volumen o sacá el modo silencio y tocá «Repetir».';
   else if (left === 0) els.status.textContent = '¡Salieron todas las bolillas!';
   else if (last === undefined) els.status.textContent = 'Tocá «Sacar bolilla» para empezar';
-  else els.status.textContent = `Quedan ${left}`;
+  else els.status.textContent = auto ? `Quedan ${left} · automático` : `Quedan ${left}`;
 
   // aria-disabled (not disabled) during the roll, so the button keeps keyboard and screen-reader focus.
-  els.draw.disabled = left === 0;
-  els.draw.setAttribute('aria-disabled', String(rolling));
+  // In auto mode it is the pause button, so it stays live during the roll too.
+  els.draw.textContent = auto ? 'Pausar' : 'Sacar bolilla';
+  els.draw.disabled = left === 0 && !auto;
+  els.draw.setAttribute('aria-disabled', String(rolling && !auto));
+  els.auto.disabled = left === 0;
+  els.auto.setAttribute('aria-pressed', String(auto));
+  els.auto.textContent = auto ? '⏸ Auto' : '▶ Auto';
   els.repeat.disabled = rolling || last === undefined || muted || !speech;
   els.reset.disabled = rolling;
   els.max.disabled = rolling;
@@ -332,7 +405,13 @@ function render() {
 
 // --- Events ----------------------------------------------------------------
 
-els.draw.addEventListener('click', draw);
+els.draw.addEventListener('click', onDrawButton);
+
+els.auto.addEventListener('click', () => {
+  if (auto) stopAuto();
+  else startAuto();
+  render();
+});
 
 els.repeat.addEventListener('click', () => {
   const last = state.drawn.at(-1);
@@ -365,7 +444,7 @@ document.addEventListener('keydown', (event) => {
   if (event.code !== 'Space' || event.repeat) return;
   if (event.target.closest?.('button, select, input, a')) return;
   event.preventDefault();
-  draw();
+  onDrawButton();
 });
 
 // Ask for the wake lock on the first touch too, so the screen stays on before the first draw.
@@ -373,8 +452,11 @@ document.addEventListener('pointerdown', keepAwake, { once: true });
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
-    // Don't let a half-spoken number play late when the host comes back.
+    // Pause auto mode, so balls never come out while the phone is locked,
+    // and don't let a half-spoken number play late when the host comes back.
+    stopAuto();
     stopSpeech();
+    render();
     return;
   }
   syncFromStorage();

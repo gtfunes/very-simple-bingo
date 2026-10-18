@@ -8,6 +8,7 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 
 - Big "Sacar bolilla" button pinned to the bottom of the screen, within thumb reach.
 - Draws balls from 1–90 (default) or 1–75, with no repeats.
+- Auto mode (**▶ Auto**): draws a ball 2 seconds after each callout ends, until you tap **Pausar**. It pauses when the screen locks and when all balls are out. Change the pause with `AUTO_PAUSE_MS` in `app.js`.
 - Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Both parts are queued together, because phones clip the start of speech that follows a silence.
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
@@ -15,7 +16,7 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 - Keeps the screen on during a game, where the browser supports it.
 - Works offline after the first visit, and installs to the Home Screen with its own icon.
 - Shows a hint when the voice does not start (for example, silent mode on an iPhone).
-- Press <kbd>Space</kbd> to draw a ball.
+- Press <kbd>Space</kbd> to draw a ball (or to pause auto mode).
 
 The interface text is in Spanish (Argentina).
 
