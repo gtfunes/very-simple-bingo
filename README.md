@@ -9,6 +9,8 @@ It is made for phones first. No build step and no dependencies: plain HTML, CSS 
 - Big "Sacar bolilla" button pinned to the bottom of the screen, within thumb reach.
 - Draws balls from 1–90 (default) or 1–75, with no repeats.
 - Auto mode (**▶ Auto**): draws a ball 2 seconds after each callout ends, until you tap **Pausar**. It pauses when the screen locks and when all balls are out. Change the pause with `AUTO_PAUSE_MS` in `app.js`.
+- Voice picker (**Voz**): the device's Spanish voices, the natural ones first, then the funny ones (on iPhone and Mac: Grandpa, Rocko, Flo…). **Estilo** changes the pitch and the speed: Normal, Ardilla, Monstruo or Apurado (`VOICE_STYLES` in `app.js`).
+- Sayings (**Dichos**): a joke right after each number, by voice and on screen, such as "8, ¡el culo te abrocho!". Edit them in `SAYINGS` and `RHYMES` in `app.js`.
 - Announces each number by voice in Spanish: the number, a short pause, then its digits ("47" … "cuatro, siete"). It uses the browser's Web Speech API. Both parts are queued together, because phones clip the start of speech that follows a silence.
 - Shows a board with every number that came out, plus the last five balls.
 - Keeps the game after a page reload (saved in the browser's `localStorage`).
@@ -100,7 +102,7 @@ On GitHub Pages these last protections are missing. The risk is low: the app has
 
 ## Notes
 
-- The voice depends on the device. The app picks a natural Spanish voice and skips Apple's robotic novelty voices. If the device has no Spanish voice, the browser uses its default voice.
+- The voices depend on the device. With **Voz** on «Automática», the app picks a natural Spanish voice and skips Apple's robotic novelty voices. If the device has no Spanish voice, the browser uses its default voice.
 - If you hear nothing on an iPhone, turn off silent mode and tap **Repetir**.
 - For a full-screen app feel, open the site on the phone and use **Add to Home Screen**.
 - If you add a file the app needs, add it to `.vercelignore` (so it is uploaded) and to `ASSETS` in `sw.js` (so it works offline).

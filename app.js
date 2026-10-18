@@ -7,9 +7,55 @@ const AUTO_PAUSE_MS = 2000;
 const HISTORY_SIZE = 5;
 const VOICE_TIMEOUT_MS = 2500;
 const VOICE_LANGS = ['es-ar', 'es-419', 'es-mx', 'es-us', 'es-es'];
-// Apple lists its robotic "Eloquence" voices first; skip them for a natural one (Paulina, Mónica…).
+// Apple lists its robotic "Eloquence" voices first. The automatic pick skips them for a natural one
+// (Paulina, Mónica…), and the voice picker lists them as the funny ones.
 const ROBOTIC_VOICES = /^(eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b|eloquence/i;
+// Pitch (0 to 2) and speed of each voice style.
+const VOICE_STYLES = {
+  normal: { label: 'Normal', pitch: 1, rate: 0.9 },
+  ardilla: { label: 'Ardilla', pitch: 2, rate: 1.1 },
+  monstruo: { label: 'Monstruo', pitch: 0.1, rate: 0.75 },
+  apurado: { label: 'Apurado', pitch: 1.1, rate: 1.6 },
+};
 const DIGIT_WORDS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+
+// Sayings («Dichos»): said right after the number, as in "8, ¡el culo te abrocho!".
+// SAYINGS wins for its numbers. Every other number rhymes with its last word, so 8, 18, 28… all
+// rhyme with "ocho"; RHYMES picks one of the variants by the tens digit.
+const SAYINGS = {
+  10: '¡como el Diego y como Messi!',
+  11: '¡más duro que el bronce!',
+  12: '¡una docena de facturas!',
+  13: '¡la mala suerte!',
+  14: '¡que nadie se esfuerce!',
+  15: '¡la niña bonita!',
+  20: '¡apretá los dientes!',
+  22: '¡los dos patitos!',
+  30: '¡la vieja contenta!',
+  33: '¡la edad de Cristo!',
+  40: '¡te canto las cuarenta!',
+  48: '¡el muerto que habla!',
+  50: '¡y nadie se da cuenta!',
+  55: '¡pegá dos brincos!',
+  60: '¡la abuela se sienta!',
+  69: '¡dalo vuelta y es el mismo!',
+  70: '¡pagá la cuenta!',
+  77: '¡las dos banderitas!',
+  80: '¡con sal y pimienta!',
+  88: '¡las dos gorditas!',
+  90: '¡el abuelo!',
+};
+const RHYMES = {
+  1: ['¡como el Diego no hay ninguno!', '¡tomate el desayuno!'],
+  2: ['¡te quiero a vos!', '¡arroz con pollo para los dos!'],
+  3: ['¡el que no salta es un inglés!', '¡el mundo al revés!'],
+  4: ['¡el gato en el teatro!', '¡aplausos en el teatro!'],
+  5: ['¡pegá un brinco!', '¡bailá con ahínco!'],
+  6: ['¡pagame a fin de mes!', '¡saltá con los dos pies!'],
+  7: ['¡chupete!', '¡te como el cachete!'],
+  8: ['¡el culo te abrocho!', '¡comete un bizcocho!'],
+  9: ['¡el que se mueve no sale en la foto!', '¡guarda que llueve!'],
+};
 
 const els = {
   ball: document.getElementById('ball'),
@@ -26,6 +72,12 @@ const els = {
   mute: document.getElementById('mute'),
   auto: document.getElementById('auto'),
   reset: document.getElementById('reset'),
+  saying: document.getElementById('saying'),
+  voiceField: document.getElementById('voice-field'),
+  voice: document.getElementById('voice'),
+  styleField: document.getElementById('style-field'),
+  style: document.getElementById('style'),
+  sayings: document.getElementById('sayings'),
 };
 
 const speech = 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -56,7 +108,14 @@ function readSaved() {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && BALL_OPTIONS.includes(saved.max) && Array.isArray(saved.drawn)) {
       const drawn = saved.drawn.filter((n) => Number.isInteger(n) && n >= 1 && n <= saved.max);
-      return { max: saved.max, drawn: [...new Set(drawn)], muted: Boolean(saved.muted) };
+      return {
+        max: saved.max,
+        drawn: [...new Set(drawn)],
+        muted: Boolean(saved.muted),
+        voice: typeof saved.voice === 'string' ? saved.voice : '',
+        style: Object.hasOwn(VOICE_STYLES, saved.style) ? saved.style : 'normal',
+        sayings: Boolean(saved.sayings),
+      };
     }
   } catch {
     // Storage blocked or corrupt.
@@ -65,7 +124,7 @@ function readSaved() {
 }
 
 function load() {
-  return readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false };
+  return readSaved() ?? { max: DEFAULT_MAX, drawn: [], muted: false, voice: '', style: 'normal', sayings: false };
 }
 
 function save() {
@@ -83,6 +142,7 @@ function syncFromStorage() {
   const maxChanged = saved.max !== state.max;
   state = saved;
   if (maxChanged) buildBoard();
+  if (speech) pickVoice();
   render();
 }
 
@@ -102,16 +162,55 @@ function randomIndex(length) {
 
 // --- Voice -----------------------------------------------------------------
 
+const langOf = (v) => v.lang.replace('_', '-').toLowerCase();
+const isFunny = (v) => ROBOTIC_VOICES.test(v.name) || ROBOTIC_VOICES.test(v.voiceURI);
+
+function spanishVoices() {
+  return speech.getVoices().filter((v) => langOf(v).startsWith('es'));
+}
+
+// The voice picked in «Voz» if this device has it, else a natural Spanish voice.
 function pickVoice() {
-  const langOf = (v) => v.lang.replace('_', '-').toLowerCase();
-  const spanish = speech
-    .getVoices()
-    .filter((v) => langOf(v).startsWith('es') && !ROBOTIC_VOICES.test(v.name) && !ROBOTIC_VOICES.test(v.voiceURI));
+  const all = spanishVoices();
+  const natural = all.filter((v) => !isFunny(v));
   voice =
-    spanish.find((v) => v.default) ??
-    VOICE_LANGS.map((lang) => spanish.find((v) => langOf(v) === lang)).find(Boolean) ??
-    spanish[0] ??
+    all.find((v) => v.voiceURI === state.voice) ??
+    natural.find((v) => v.default) ??
+    VOICE_LANGS.map((lang) => natural.find((v) => langOf(v) === lang)).find(Boolean) ??
+    natural[0] ??
     null;
+}
+
+// "Grandpa (Spanish (Mexico))" → "Grandpa (México)".
+function voiceLabel(v) {
+  const name = v.name.replace(/\s*\(.*\)\s*$/, '') || v.name;
+  const region = langOf(v).split('-')[1];
+  if (!region) return name;
+  try {
+    return `${name} (${new Intl.DisplayNames(['es'], { type: 'region' }).of(region.toUpperCase())})`;
+  } catch {
+    return `${name} (${region.toUpperCase()})`;
+  }
+}
+
+// The voice list arrives late on iOS and Android (on "voiceschanged"), so this runs again then.
+function buildVoiceOptions() {
+  const group = (label, voices) => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = label;
+    const options = voices.map((v) => new Option(voiceLabel(v), v.voiceURI));
+    options.sort((a, b) => a.text.localeCompare(b.text, 'es'));
+    optgroup.append(...options);
+    return optgroup;
+  };
+  const all = spanishVoices();
+  const natural = all.filter((v) => !isFunny(v));
+  const funny = all.filter(isFunny);
+  els.voice.replaceChildren(
+    new Option('Automática', ''),
+    ...(natural.length ? [group('Naturales', natural)] : []),
+    ...(funny.length ? [group('Divertidas', funny)] : []),
+  );
 }
 
 function setVoiceProblem(value) {
@@ -137,7 +236,9 @@ function makeUtterance(text, volume) {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = voice?.lang ?? 'es-AR';
   if (voice) utterance.voice = voice;
-  utterance.rate = 0.9;
+  const { pitch, rate } = VOICE_STYLES[state.style];
+  utterance.pitch = pitch;
+  utterance.rate = rate;
   utterance.volume = volume;
   utterance.onerror = (event) => {
     // Errors from speech that was already replaced or stopped do not matter.
@@ -201,14 +302,28 @@ function primeSpeech() {
   speak(' ', 0);
 }
 
+function sayingFor(n) {
+  if (SAYINGS[n]) return SAYINGS[n];
+  const rhymes = RHYMES[n % 10];
+  return rhymes ? rhymes[Math.floor(n / 10) % rhymes.length] : '';
+}
+
 // "47." then "cuatro, siete": two utterances give a sentence break between the number and its digits.
+// With «Dichos» on, the saying comes right after the number: "47, ¡te como el cachete!".
 function callout(n) {
-  if (n < 10) return [`${n}`];
+  const saying = state.sayings ? sayingFor(n) : '';
+  const number = saying ? `${n}, ${saying}` : `${n}.`;
+  if (n < 10) return [number];
   const digits = String(n)
     .split('')
     .map((d) => DIGIT_WORDS[Number(d)])
     .join(', ');
-  return [`${n}.`, digits];
+  return [number, digits];
+}
+
+// Called from a change event (a user gesture), so iOS lets it speak.
+function previewVoice() {
+  if (!state.muted) speak('¡Hola! Así canto los números.');
 }
 
 // Resolves when the callout is over (at once when the voice is off).
@@ -383,6 +498,15 @@ function render() {
   els.mute.setAttribute('aria-pressed', String(!muted));
   els.mute.textContent = muted ? '🔇 Voz' : '🔊 Voz';
 
+  els.voiceField.hidden = !speech;
+  els.styleField.hidden = !speech;
+  els.voice.value = voice && voice.voiceURI === state.voice ? state.voice : '';
+  els.style.value = state.style;
+  els.sayings.checked = state.sayings;
+  const saying = state.sayings && !rolling && last !== undefined ? sayingFor(last) : '';
+  els.saying.textContent = saying;
+  els.saying.hidden = !saying;
+
   els.history.replaceChildren(
     ...drawn
       .slice(-HISTORY_SIZE - 1, -1)
@@ -422,6 +546,25 @@ els.mute.addEventListener('click', () => {
   state.muted = !state.muted;
   if (state.muted) stopSpeech();
   voiceProblem = false;
+  save();
+  render();
+});
+
+els.voice.addEventListener('change', () => {
+  state.voice = els.voice.value;
+  pickVoice();
+  save();
+  previewVoice();
+});
+
+els.style.addEventListener('change', () => {
+  state.style = els.style.value;
+  save();
+  previewVoice();
+});
+
+els.sayings.addEventListener('change', () => {
+  state.sayings = els.sayings.checked;
   save();
   render();
 });
@@ -472,9 +615,18 @@ new ResizeObserver(() => {
   document.documentElement.style.setProperty('--bar-height', `${els.actions.offsetHeight}px`);
 }).observe(els.actions);
 
+els.style.append(...Object.entries(VOICE_STYLES).map(([key, { label }]) => new Option(label, key)));
+
+function onVoicesChanged() {
+  pickVoice();
+  buildVoiceOptions();
+  render();
+}
+
 if (speech) {
   pickVoice();
-  speech.addEventListener('voiceschanged', pickVoice);
+  buildVoiceOptions();
+  speech.addEventListener('voiceschanged', onVoicesChanged);
 }
 
 // Offline support for the deployed site. Skipped on localhost so it never caches other local dev servers.

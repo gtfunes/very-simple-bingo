@@ -36,6 +36,7 @@
         <div class="ball empty" id="ball">
           <span class="ball-number" id="current">–</span>
         </div>
+        <p class="saying" id="saying" hidden></p>
         <p class="status" id="status"></p>
         <p class="sr-only" id="announce" aria-live="polite" aria-atomic="true"></p>
 
@@ -64,6 +65,20 @@
           </select>
         </label>
         <button id="reset" type="button">Nuevo juego</button>
+        <label class="field" id="voice-field">
+          Voz
+          <select id="voice">
+            <option value="">Automática</option>
+          </select>
+        </label>
+        <label class="field" id="style-field">
+          Estilo
+          <select id="style"></select>
+        </label>
+        <label class="field check">
+          <input type="checkbox" id="sayings" />
+          Dichos
+        </label>
       </section>
     </main>
   </body>
