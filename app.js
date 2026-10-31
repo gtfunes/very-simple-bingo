@@ -24,41 +24,117 @@ const VOICE_STYLES = {
 const DIGIT_WORDS = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
 
 // Sayings («Dichos»): said right after the number, as in "8, ¡el culo te abrocho!".
-// SAYINGS wins for its numbers. Every other number rhymes with its last word, so 8, 18, 28… all
-// rhyme with "ocho"; RHYMES picks one of the variants by the tens digit.
+// Each number has its own sayings (most start with its meaning in the quiniela: 5 is the cat, 47 the
+// dead man), plus the rhymes with its last word from RHYMES. sayingFor() picks one per ball.
 const SAYINGS = {
-  10: '¡como el Diego y como Messi!',
-  11: '¡más duro que el bronce!',
-  12: '¡una docena de facturas!',
-  13: '¡la mala suerte!',
-  14: '¡que nadie se esfuerce!',
-  15: '¡la niña bonita!',
-  20: '¡apretá los dientes!',
-  22: '¡los dos patitos!',
-  30: '¡la vieja contenta!',
-  33: '¡la edad de Cristo!',
-  40: '¡te canto las cuarenta!',
-  48: '¡el muerto que habla!',
-  50: '¡y nadie se da cuenta!',
-  55: '¡pegá dos brincos!',
-  60: '¡la abuela se sienta!',
-  69: '¡dalo vuelta y es el mismo!',
-  70: '¡pagá la cuenta!',
-  77: '¡las dos banderitas!',
-  80: '¡con sal y pimienta!',
-  88: '¡las dos gorditas!',
-  90: '¡el abuelo!',
+  1: ['¡el agua!'],
+  2: ['¡el niño!'],
+  3: ['¡San Cono!'],
+  4: ['¡la cama!'],
+  5: ['¡el gato!'],
+  6: ['¡el perro!'],
+  7: ['¡el revólver!'],
+  8: ['¡el incendio!'],
+  9: ['¡el arroyo!'],
+  10: ['¡la leche!', '¡como el Diego y como Messi!', '¡la camiseta del Diez!'],
+  11: ['¡los dos palitos!', '¡más duro que el bronce!'],
+  12: ['¡el soldado!', '¡una docena de facturas!'],
+  13: ['¡la yeta!', '¡la mala suerte!', '¡el culo te crece!'],
+  14: ['¡el borracho!', '¡que nadie se esfuerce!'],
+  15: ['¡la niña bonita!'],
+  16: ['¡el anillo!'],
+  17: ['¡la desgracia!'],
+  18: ['¡la sangre!'],
+  19: ['¡el pescado!'],
+  20: ['¡la fiesta!', '¡apretá los dientes!', '¡pan con aceite!'],
+  21: ['¡la mujer!'],
+  22: ['¡el loco!', '¡los dos patitos!'],
+  23: ['¡el cocinero!'],
+  24: ['¡el caballo!'],
+  25: ['¡la gallina!'],
+  26: ['¡la misa!'],
+  27: ['¡el peine!'],
+  28: ['¡el cerro!'],
+  29: ['¡San Pedro!'],
+  30: ['¡Santa Rosa!'],
+  31: ['¡la luz!'],
+  32: ['¡la guita!'],
+  33: ['¡la edad de Cristo!'],
+  34: ['¡la cabeza!'],
+  35: ['¡el pajarito!'],
+  36: ['¡la manteca!'],
+  37: ['¡el dentista!'],
+  38: ['¡las piedras!'],
+  39: ['¡la lluvia!'],
+  40: ['¡el cura!', '¡te canto las cuarenta!'],
+  41: ['¡el cuchillo!'],
+  42: ['¡las zapatillas!'],
+  43: ['¡el balcón!'],
+  44: ['¡la cárcel!'],
+  45: ['¡el vino!'],
+  46: ['¡los tomates!'],
+  47: ['¡el muerto!'],
+  48: ['¡el muerto que habla!'],
+  49: ['¡la carne!'],
+  50: ['¡el pan!'],
+  51: ['¡el serrucho!'],
+  52: ['¡madre e hijo!'],
+  53: ['¡el barco!'],
+  54: ['¡la vaca!'],
+  55: ['¡la música!', '¡pegá dos brincos!'],
+  56: ['¡la caída!'],
+  57: ['¡el jorobado!'],
+  58: ['¡el ahogado!'],
+  59: ['¡las plantas!'],
+  60: ['¡la Virgen!'],
+  61: ['¡la escopeta!'],
+  62: ['¡la inundación!'],
+  63: ['¡el casamiento!'],
+  64: ['¡el llanto!'],
+  65: ['¡el cazador!'],
+  66: ['¡la lombriz!'],
+  67: ['¡la mordida!'],
+  68: ['¡los sobrinos!'],
+  69: ['¡los vicios!', '¡dalo vuelta y es el mismo!'],
+  70: ['¡el muerto que sueña!'],
+  72: ['¡la sorpresa!'],
+  73: ['¡el hospital!'],
+  75: ['¡el payaso!'],
+  76: ['¡las llamas!'],
+  77: ['¡las dos banderitas!'],
+  79: ['¡el ladrón!'],
+  80: ['¡la bocha!'],
+  81: ['¡las flores!'],
+  82: ['¡la pelea!'],
+  83: ['¡el mal tiempo!'],
+  84: ['¡la iglesia!'],
+  85: ['¡la linterna!'],
+  86: ['¡el humo!'],
+  87: ['¡los piojos!'],
+  88: ['¡el Papa!', '¡las dos gorditas!'],
+  89: ['¡la rata!'],
+  90: ['¡el miedo!', '¡el abuelo!'],
 };
+// By last digit, so 8, 18, 28… all rhyme with "ocho". 0 is for 30 to 90, which all end in "-enta".
+// 10 to 15 and 20 end in their own words, so their rhymes are in SAYINGS.
 const RHYMES = {
-  1: ['¡como el Diego no hay ninguno!', '¡tomate el desayuno!'],
-  2: ['¡te quiero a vos!', '¡arroz con pollo para los dos!'],
-  3: ['¡el que no salta es un inglés!', '¡el mundo al revés!'],
-  4: ['¡el gato en el teatro!', '¡aplausos en el teatro!'],
+  0: [
+    '¡la vieja contenta!',
+    '¡y nadie se da cuenta!',
+    '¡la abuela se sienta!',
+    '¡pagá la cuenta!',
+    '¡con sal y pimienta!',
+    '¡llegó la tormenta!',
+  ],
+  1: ['¡como el Diego no hay ninguno!', '¡tomate el desayuno!', '¡a ver si sale alguno!'],
+  2: ['¡te quiero a vos!', '¡arroz con pollo para los dos!', '¡gracias a Dios!'],
+  3: ['¡el que no salta es un inglés!', '¡el mundo al revés!', '¡no te duermas otra vez!'],
+  4: ['¡el gato en el teatro!', '¡aplausos en el teatro!', '¡esperá un rato!'],
   5: ['¡pegá un brinco!', '¡bailá con ahínco!'],
   6: ['¡pagame a fin de mes!', '¡saltá con los dos pies!'],
-  7: ['¡chupete!', '¡te como el cachete!'],
+  7: ['¡chupete!', '¡te como el cachete!', '¡cuidado con el cohete!', '¡el que no baila es un zoquete!'],
   8: ['¡el culo te abrocho!', '¡comete un bizcocho!'],
-  9: ['¡el que se mueve no sale en la foto!', '¡guarda que llueve!'],
+  9: ['¡el que se mueve no sale en la foto!', '¡guarda que llueve!', '¡a ver quién se atreve!'],
 };
 
 const els = {
@@ -343,10 +419,18 @@ function primeSpeech() {
   speak(' ', 0);
 }
 
+function rhymesFor(n) {
+  if ((n >= 10 && n <= 15) || n === 20) return [];
+  return RHYMES[n % 10] ?? [];
+}
+
+// Picked by the ball's place in the game, not at random: a number gets a different saying from game
+// to game, but the same one on screen, in the callout, in «Repetir», after a reload and in other tabs.
 function sayingFor(n) {
-  if (SAYINGS[n]) return SAYINGS[n];
-  const rhymes = RHYMES[n % 10];
-  return rhymes ? rhymes[Math.floor(n / 10) % rhymes.length] : '';
+  const options = [...(SAYINGS[n] ?? []), ...rhymesFor(n)];
+  if (!options.length) return '';
+  const place = Math.max(0, state.drawn.indexOf(n));
+  return options[(place + n) % options.length];
 }
 
 // "47." then "cuatro, siete": two utterances give a sentence break between the number and its digits.
